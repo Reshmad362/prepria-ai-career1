@@ -1,0 +1,340 @@
+.cert-page {
+  min-height: 100vh;
+  background-color: #0f172a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.cert-actions {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.cert-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  border: none;
+}
+
+.cert-btn.primary {
+  background: linear-gradient(135deg, #a855f7, #ec4899);
+  color: white;
+  box-shadow: 0 4px 15px rgba(236, 72, 153, 0.3);
+}
+
+.cert-btn.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(236, 72, 153, 0.4);
+}
+
+.cert-btn.secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.cert-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* --- CERTIFICATE LAYOUT --- */
+
+.cert-wrapper {
+  position: relative;
+  width: 1000px;
+  height: 700px;
+  background: white;
+  padding: 40px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+/* Decorative Gold Borders */
+.cert-border-outer {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  right: 20px;
+  bottom: 20px;
+  border: 2px solid #b8935a;
+  z-index: 1;
+}
+
+.cert-border-inner {
+  position: absolute;
+  top: 30px;
+  left: 30px;
+  right: 30px;
+  bottom: 30px;
+  border: 4px double #b8935a;
+  z-index: 1;
+}
+
+/* Background Elements */
+.cert-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle at center, #ffffff 0%, #fdfbf7 100%);
+  z-index: 0;
+}
+
+.cert-watermark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 400px;
+  height: 400px;
+  opacity: 0.03;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.cert-corner-tl { position: absolute; top: 0; left: 0; width: 150px; height: 150px; background: linear-gradient(135deg, #f3e5c9 0%, transparent 50%); z-index: 0; }
+.cert-corner-tr { position: absolute; top: 0; right: 0; width: 150px; height: 150px; background: linear-gradient(225deg, #f3e5c9 0%, transparent 50%); z-index: 0; }
+.cert-corner-bl { position: absolute; bottom: 0; left: 0; width: 150px; height: 150px; background: linear-gradient(45deg, #f3e5c9 0%, transparent 50%); z-index: 0; }
+.cert-corner-br { position: absolute; bottom: 0; right: 0; width: 150px; height: 150px; background: linear-gradient(315deg, #f3e5c9 0%, transparent 50%); z-index: 0; }
+
+
+/* Content Container */
+.cert-content {
+  position: relative;
+  z-index: 10;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  text-align: center;
+  padding: 30px 40px;
+  color: #1e293b;
+}
+
+/* Header */
+.cert-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.cert-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.cert-logo-icon {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #4f46e5, #ec4899);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.cert-title {
+  font-family: 'Georgia', serif;
+  font-size: 3.5rem;
+  font-weight: normal;
+  color: #0f172a;
+  margin: 0;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  border-bottom: 2px solid #b8935a;
+  padding-bottom: 10px;
+}
+
+/* Body */
+.cert-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  max-width: 800px;
+}
+
+.cert-subtitle {
+  font-size: 1.2rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.cert-name {
+  font-family: 'Georgia', serif;
+  font-size: 3rem;
+  font-weight: bold;
+  color: #0f172a;
+  margin: 10px 0;
+  font-style: italic;
+}
+
+.cert-statement {
+  font-size: 1.1rem;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.cert-course-title {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 10px 0;
+  padding: 10px 30px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+/* Footer / Signatures */
+.cert-footer {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: auto;
+  padding: 0 40px;
+}
+
+.cert-signature-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 250px;
+}
+
+.cert-signature-line {
+  width: 100%;
+  height: 1px;
+  background-color: #0f172a;
+  margin-bottom: 8px;
+  position: relative;
+}
+
+.cert-signature-img {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  opacity: 0.8;
+}
+
+.cert-signature-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.cert-seal {
+  width: 100px;
+  height: 100px;
+  background: #b8935a;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-shadow: 0 4px 10px rgba(184, 147, 90, 0.4);
+}
+
+.cert-seal-inner {
+  width: 86px;
+  height: 86px;
+  border: 1px dashed white;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  text-align: center;
+}
+
+.cert-seal-text {
+  font-size: 0.6rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.cert-seal-year {
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.cert-id-block {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.75rem;
+  color: #94a3b8;
+  letter-spacing: 1px;
+  z-index: 20;
+}
+
+
+/* --- PRINT MEDIA QUERIES FOR PDF EXPORT --- */
+@media print {
+  @page {
+    size: landscape;
+    margin: 0;
+  }
+  
+  body {
+    background: white !important;
+  }
+  
+  .cert-page {
+    padding: 0 !important;
+    background: none !important;
+    min-height: auto !important;
+    display: block !important;
+  }
+  
+  .cert-actions {
+    display: none !important;
+  }
+  
+  .cert-wrapper {
+    width: 100vw !important;
+    height: 100vh !important;
+    box-shadow: none !important;
+    padding: 10mm !important; /* Adjust margins inside the page */
+    margin: 0 !important;
+    page-break-after: avoid;
+    break-inside: avoid;
+  }
+  
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
