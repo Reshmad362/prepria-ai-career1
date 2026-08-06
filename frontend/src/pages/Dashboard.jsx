@@ -2,10 +2,11 @@ import React, { useEffect, useState, useContext } from 'react';
 import { UserContext } from '../contexts/UserContext';
 import Card from '../components/Card';
 import Button from '../components/Button';
-import Badge from '../components/Badge';
-import { Target, FileText, CheckCircle, TrendingUp, Clock, FileUp, Sparkles, MessageSquare, LogIn } from 'lucide-react';
+import DashboardStatCard from '../components/DashboardStatCard';
+import { Target, FileSearch, CheckCircle, TrendingUp, Sparkles, MessageSquare, Briefcase, Award, Zap, BrainCircuit, Activity, Clock, FileUp, LogIn } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatTime } from '../utils/activityLogger';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -13,188 +14,314 @@ export default function Dashboard() {
   const [userName, setUserName] = useState('User');
   const [activities, setActivities] = useState([]);
   
-  // Real data state
-  const [atsScore, setAtsScore] = useState(0);
-  const [totalInterviews, setTotalInterviews] = useState(0);
-  const [avgConfidence, setAvgConfidence] = useState(0);
-  const [profileMatch, setProfileMatch] = useState('N/A');
+  // Dashboard Metrics State
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [metrics, setMetrics] = useState({
+    aiCareerScore: 0,
+    careerReadiness: 'Low',
+    atsScore: 0,
+    resumeMatch: '0%',
+    technicalScore: 0,
+    communicationScore: 0,
+    confidenceScore: 0,
+    currentStreak: 0,
+    learningHours: 0,
+    interviewScore: 0,
+    profileCompletion: 0,
+    coursesCompleted: 0,
+    certificatesEarned: 0,
+    targetCompany: 'Not Set',
+    targetRole: 'Not Set',
+    recommendedNextStep: 'Upload Resume',
+    careerProgress: '0%',
+    resumeUpdatedDate: 'N/A',
+    weeklyGrowth: 0,
+    monthlyGrowth: 0,
+    interviewReadiness: '0%',
+    recentHistory: [],
+    trend: 'No Data'
+  });
 
   useEffect(() => {
     if (profile) {
       setUserName(profile.name && profile.name !== 'Not found' ? profile.name : 'User');
-      const extractedScore = profile.score || 0;
-      setAtsScore(extractedScore);
-      
-      if (extractedScore > 80) setProfileMatch('Excellent');
-      else if (extractedScore > 60) setProfileMatch('Good');
-      else if (extractedScore > 0) setProfileMatch('Needs Work');
-      else setProfileMatch('Upload Resume');
-    } else {
-      setUserName('User');
-      setAtsScore(0);
-      setProfileMatch('Upload Resume');
     }
   }, [profile]);
 
   useEffect(() => {
-    // Fetch Interview Sessions
-    const sessions = JSON.parse(localStorage.getItem('mockInterviewSessions')) || [];
-    setTotalInterviews(sessions.length);
-    
-    if (sessions.length > 0) {
-       const totalScore = sessions.reduce((sum, session) => sum + session.avgScore, 0);
-       setAvgConfidence(Math.round(totalScore / sessions.length));
-    } else {
-       setAvgConfidence(0);
-    }
-    
+    // Fetch Activities
     const fetchActivities = () => {
       const stored = JSON.parse(localStorage.getItem('activities') || '[]');
       setActivities(stored);
     };
-    
     fetchActivities();
     window.addEventListener('activityLogged', fetchActivities);
+    
+    // Fetch Dashboard Analytics
+    const fetchAnalytics = async () => {
+      try {
+        setLoading(true);
+        const email = profile?.email || localStorage.getItem('userEmail');
+        if (!email) {
+            setLoading(false);
+            return;
+        }
+
+        const response = await fetch(`http://localhost:8000/analytics/dashboard/${email}`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch analytics');
+        }
+        
+        const result = await response.json();
+        if (result.success && result.data) {
+            setMetrics(result.data);
+        }
+      } catch (err) {
+        console.error("Dashboard fetch error:", err);
+        setError("Failed to load dashboard data. Please try again later.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    if (profile?.email || localStorage.getItem('userEmail')) {
+        fetchAnalytics();
+    }
+
     return () => window.removeEventListener('activityLogged', fetchActivities);
-  }, []);
+  }, [profile]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-end">
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white">Welcome back, {userName}! 👋</h1>
-          <p className="text-gray-500 font-medium mt-1">Here is a summary of your career progress.</p>
+          <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white font-poppins">Welcome back, {userName}! 👋</h1>
+          <p className="text-gray-500 dark:text-gray-400 font-medium mt-1 font-inter">Here is your executive career overview.</p>
         </div>
-        <Button onClick={() => navigate('/resume-upload')} className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 hover:scale-105 shadow-md">Upload Resume</Button>
+        <div className="flex gap-3">
+          <Button onClick={() => navigate('/resume-upload')} variant="outline" className="shadow-sm border-[#FF6B00] text-[#FF6B00] hover:bg-[#FF6B00] hover:text-white transition-colors">
+            Update Resume
+          </Button>
+          <Button onClick={() => navigate('/mock-interview')} className="bg-[#FF6B00] hover:bg-[#E65C00] text-white shadow-md shadow-[#FF6B00]/20 border-0">
+            Start Interview
+          </Button>
+        </div>
       </div>
+
+      {error && (
+          <div className="p-4 bg-red-50 text-red-600 border border-red-200 rounded-xl flex items-center justify-between">
+              <span>{error}</span>
+              <button onClick={() => window.location.reload()} className="text-sm underline font-medium">Retry</button>
+          </div>
+      )}
 
       {/* Profile Completion Alert in Dashboard */}
       {profileCompletion < 100 && (
-        <Card className="bg-indigo-50 border-l-4 border-indigo-500 dark:bg-indigo-900/10 mb-6 p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+        <Card className="bg-[#FF6B00]/5 border-l-4 border-[#FF6B00] dark:bg-[#FF6B00]/10 mb-6 p-4 flex flex-col md:flex-row items-center justify-between gap-4">
           <div>
-            <h3 className="font-bold text-indigo-900 dark:text-indigo-100 flex items-center gap-2">
-              <Target className="w-5 h-5 text-indigo-500" /> Complete Your Profile ({profileCompletion}%)
+            <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2 font-poppins">
+              <Target className="w-5 h-5 text-[#FF6B00]" /> Complete Your Profile ({profileCompletion}%)
             </h3>
-            <p className="text-sm text-indigo-700 dark:text-indigo-300 mt-1">Unlock tailored opportunities and better AI insights by finishing your profile.</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 font-inter">Unlock tailored opportunities and better AI insights by finishing your profile.</p>
             {missingFields?.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-2 items-center">
-                <span className="text-xs font-semibold text-indigo-500">Missing:</span>
+                <span className="text-xs font-semibold text-[#FF6B00]">Missing:</span>
                 {missingFields.map((f, i) => (
-                  <span key={i} className="text-xs px-2 py-1 bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 rounded-md shadow-sm border border-indigo-100 dark:border-indigo-800">
+                  <span key={i} className="text-xs px-2 py-1 bg-white dark:bg-[#141414] text-gray-700 dark:text-gray-300 rounded-md shadow-sm border border-gray-200 dark:border-gray-800">
                     {f}
                   </span>
                 ))}
               </div>
             )}
           </div>
-          <Button onClick={() => navigate('/profile')} variant="primary" className="whitespace-nowrap shrink-0">
+          <Button onClick={() => navigate('/profile')} className="whitespace-nowrap shrink-0 bg-[#111111] text-white hover:bg-gray-800">
             Complete Now
           </Button>
         </Card>
       )}
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="flex flex-col gap-4 hover:shadow-md transition-shadow">
-          <div className="flex justify-between items-center">
-            <h3 className="font-medium text-gray-500">ATS Score</h3>
-            <div className="p-2 bg-primary/10 text-primary rounded-lg">
-              <FileText className="w-5 h-5" />
+      {/* Executive KPI Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <DashboardStatCard 
+          loading={loading}
+          title="AI Career Score" 
+          value={metrics.aiCareerScore} 
+          icon={BrainCircuit} 
+          trend={metrics.weeklyGrowth >= 0 ? "up" : "down"}
+          trendValue={`${Math.abs(metrics.weeklyGrowth)}%`}
+          subtitle={`Readiness: ${metrics.careerReadiness}`}
+          colorClass="text-[#FF6B00] bg-[#FF6B00]/10" 
+        />
+        <DashboardStatCard 
+          loading={loading}
+          title="ATS Score" 
+          value={metrics.atsScore} 
+          icon={FileSearch} 
+          trend="neutral"
+          trendValue="Updated"
+          subtitle={`Match: ${metrics.resumeMatch}`}
+          colorClass="text-blue-500 bg-blue-500/10" 
+        />
+        <DashboardStatCard 
+          loading={loading}
+          title="Interview Score" 
+          value={`${metrics.interviewScore}%`} 
+          icon={Target} 
+          trend={metrics.monthlyGrowth >= 0 ? "up" : "down"}
+          trendValue={`${Math.abs(metrics.monthlyGrowth)}%`}
+          subtitle={`Target: ${metrics.targetCompany}`}
+          colorClass="text-green-500 bg-green-500/10" 
+        />
+        <DashboardStatCard 
+          loading={loading}
+          title="Communication" 
+          value={`${metrics.communicationScore}%`} 
+          icon={Activity} 
+          trend="up"
+          trendValue="Top 20%"
+          subtitle="Fluency & Pacing"
+          colorClass="text-purple-500 bg-purple-500/10" 
+        />
+      </div>
+
+      {/* Growth Charts & Next Steps */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Performance Trend Chart */}
+        <Card className="lg:col-span-2">
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white font-poppins">Longitudinal Performance</h2>
+                <div className="text-sm font-medium px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-600 dark:text-gray-300">
+                    Trend: <span className={metrics.trend === 'Increasing' ? 'text-green-500' : metrics.trend === 'Decreasing' ? 'text-red-500' : ''}>{metrics.trend}</span>
+                </div>
             </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-text">{atsScore}</span>
-            <span className="text-sm font-medium text-gray-400">/100</span>
-          </div>
+            
+            {loading ? (
+                <div className="h-[300px] flex items-center justify-center animate-pulse bg-gray-50 dark:bg-gray-900 rounded-xl">
+                     <span className="text-gray-400 font-medium">Loading Chart Data...</span>
+                </div>
+            ) : metrics.recentHistory.length > 0 ? (
+                <div className="h-[300px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={metrics.recentHistory} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <defs>
+                                <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#FF6B00" stopOpacity={0.3}/>
+                                    <stop offset="95%" stopColor="#FF6B00" stopOpacity={0}/>
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#333" opacity={0.2} />
+                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#888', fontSize: 12}} dy={10} />
+                            <YAxis axisLine={false} tickLine={false} tick={{fill: '#888', fontSize: 12}} />
+                            <Tooltip 
+                                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', backgroundColor: 'var(--card)' }}
+                                itemStyle={{ fontWeight: 600 }}
+                            />
+                            <Area type="monotone" dataKey="score" name="Overall Score" stroke="#FF6B00" strokeWidth={3} fillOpacity={1} fill="url(#colorScore)" />
+                            <Line type="monotone" dataKey="fluency" name="Fluency" stroke="#2ECC71" strokeWidth={2} dot={false} />
+                            <Line type="monotone" dataKey="confidence" name="Confidence" stroke="#8B5CF6" strokeWidth={2} dot={false} />
+                        </AreaChart>
+                    </ResponsiveContainer>
+                </div>
+            ) : (
+                <div className="h-[300px] flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-xl">
+                    <TrendingUp className="w-12 h-12 text-gray-300 mb-3" />
+                    <h3 className="text-lg font-bold text-gray-700 dark:text-gray-300">No Analytics Yet</h3>
+                    <p className="text-gray-500 max-w-sm mt-1 mb-4">Complete a mock interview or resume analysis to generate your longitudinal growth charts.</p>
+                    <Button onClick={() => navigate('/mock-interview')} className="bg-[#111111] text-white hover:bg-gray-800">Generate Data</Button>
+                </div>
+            )}
         </Card>
 
-        <Card className="flex flex-col gap-4 hover:shadow-md transition-shadow">
-          <div className="flex justify-between items-center">
-            <h3 className="font-medium text-gray-500">Mock Interviews</h3>
-            <div className="p-2 bg-accent/10 text-accent rounded-lg">
-              <Target className="w-5 h-5" />
+        {/* AI Recommendations */}
+        <Card className="bg-gradient-to-br from-[#111111] to-[#222222] text-white border-0">
+            <h2 className="text-lg font-bold mb-6 font-poppins flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-[#FF6B00]" /> AI Recommended Next Steps
+            </h2>
+            
+            <div className="space-y-4">
+                <div className="bg-white/10 p-4 rounded-xl border border-white/5 backdrop-blur-sm">
+                    <h3 className="font-semibold text-lg text-[#FF9A3C]">Top Priority</h3>
+                    <p className="text-gray-300 text-sm mt-1 mb-3">{metrics.recommendedNextStep}</p>
+                    <Button 
+                        onClick={() => navigate(metrics.recommendedNextStep.includes("Resume") ? '/resume-upload' : '/mock-interview')}
+                        className="w-full bg-[#FF6B00] hover:bg-[#E65C00] text-white border-0"
+                    >
+                        Take Action
+                    </Button>
+                </div>
+                
+                <div className="bg-white/5 p-4 rounded-xl border border-white/5">
+                    <h3 className="font-medium text-sm text-gray-400 mb-2">Secondary Goals</h3>
+                    <ul className="space-y-3">
+                        <li className="flex items-start gap-3">
+                            <div className="w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0 mt-0.5"><Briefcase className="w-3 h-3" /></div>
+                            <span className="text-sm text-gray-300">Review new Job Recommendations matching {metrics.targetRole}</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                            <div className="w-6 h-6 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center shrink-0 mt-0.5"><Award className="w-3 h-3" /></div>
+                            <span className="text-sm text-gray-300">Complete missing profile achievements ({metrics.profileCompletion}%)</span>
+                        </li>
+                    </ul>
+                </div>
             </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-text">{totalInterviews}</span>
-            <span className="text-sm text-gray-400">Total</span>
-          </div>
-        </Card>
-
-        <Card className="flex flex-col gap-4 hover:shadow-md transition-shadow">
-          <div className="flex justify-between items-center">
-            <h3 className="font-medium text-gray-500">Avg. Confidence</h3>
-            <div className="p-2 bg-green-500/10 text-green-500 rounded-lg">
-              <CheckCircle className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold text-text">{avgConfidence}%</span>
-            <span className="text-sm font-medium text-gray-400">Score</span>
-          </div>
-        </Card>
-
-        <Card className="flex flex-col gap-4 hover:shadow-md transition-shadow">
-          <div className="flex justify-between items-center">
-            <h3 className="font-medium text-gray-500">Profile Match</h3>
-            <div className="p-2 bg-blue-500/10 text-blue-500 rounded-lg">
-              <TrendingUp className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <span className={`text-2xl font-bold ${profileMatch === 'Excellent' ? 'text-green-500' : profileMatch === 'Good' ? 'text-blue-500' : 'text-orange-500'}`}>
-              {profileMatch}
-            </span>
-          </div>
         </Card>
       </div>
 
-      {/* Quick Actions & Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        <Card>
-          <h2 className="text-lg font-bold text-text mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <button onClick={() => navigate('/mock-interview')} className="flex flex-col items-center justify-center p-6 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-1 transition-all gap-3">
-              <MessageSquareIcon className="w-8 h-8 text-indigo-500" />
-              <span className="font-semibold text-gray-900 dark:text-white">Start Mock Interview</span>
-            </button>
-            <button onClick={() => navigate('/role-suggestions')} className="flex flex-col items-center justify-center p-6 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-1 transition-all gap-3">
-              <BriefcaseIcon className="w-8 h-8 text-purple-500" />
-              <span className="font-semibold text-gray-900 dark:text-white">Find Roles</span>
-            </button>
-            <button onClick={() => navigate('/contact')} className="flex flex-col items-center justify-center p-6 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-1 transition-all gap-3">
-              <MailIcon className="w-8 h-8 text-blue-500" />
-              <span className="font-semibold text-gray-900 dark:text-white">Contact Support</span>
-            </button>
-            <button onClick={() => navigate('/why-us')} className="flex flex-col items-center justify-center p-6 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md hover:-translate-y-1 transition-all gap-3">
-              <StarIcon className="w-8 h-8 text-orange-500" />
-              <span className="font-semibold text-gray-900 dark:text-white">Why Us</span>
-            </button>
-          </div>
-        </Card>
+      {/* Meta Stats & Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card className="lg:col-span-1">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 font-poppins">Engagement</h2>
+              <div className="space-y-4">
+                  <div className="flex justify-between items-center p-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                          <div className="p-2 bg-orange-100 text-orange-600 dark:bg-orange-900/30 rounded-lg"><Zap className="w-4 h-4" /></div>
+                          <span className="font-medium">Current Streak</span>
+                      </div>
+                      <span className="font-bold">{metrics.currentStreak} Days</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                          <div className="p-2 bg-blue-100 text-blue-600 dark:bg-blue-900/30 rounded-lg"><Clock className="w-4 h-4" /></div>
+                          <span className="font-medium">Learning Hours</span>
+                      </div>
+                      <span className="font-bold">{metrics.learningHours} Hrs</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                          <div className="p-2 bg-purple-100 text-purple-600 dark:bg-purple-900/30 rounded-lg"><Award className="w-4 h-4" /></div>
+                          <span className="font-medium">Certificates</span>
+                      </div>
+                      <span className="font-bold">{metrics.certificatesEarned}</span>
+                  </div>
+              </div>
+          </Card>
 
-        <Card>
-          <h2 className="text-lg font-bold text-text mb-4">Recent Activity</h2>
-          <div className="space-y-4">
+          <Card className="lg:col-span-2">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 font-poppins">Recent Activity</h2>
+          <div className="space-y-3">
             {activities.length === 0 ? (
-              <p className="text-sm border border-dashed border-border rounded-lg p-6 font-medium text-gray-500 text-center">No activity yet. Start by uploading your resume.</p>
-            ) : activities.slice(0, 10).map((activity) => (
-              <div key={activity.id} className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors border border-transparent hover:border-border">
-                <div className={`p-2 rounded-full flex-shrink-0 ${activity.status === 'success' ? 'bg-green-100 text-green-600 dark:bg-green-900/30' : activity.status === 'warning' ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30' : 'bg-blue-100 text-blue-600 dark:bg-blue-900/30'}`}>
-                  {activity.type === 'resume_upload' ? <FileUp className="w-4 h-4" /> :
-                   activity.type === 'ats_analysis' ? <Sparkles className="w-4 h-4" /> :
-                   activity.type === 'interview_complete' ? <CheckCircle className="w-4 h-4" /> :
-                   activity.type === 'role_suggestion' ? <Target className="w-4 h-4" /> :
-                   activity.type === 'login' ? <LogIn className="w-4 h-4" /> :
-                   <Clock className="w-4 h-4" />}
+              <p className="text-sm border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-lg p-8 font-medium text-gray-500 text-center">No activity yet. Start by uploading your resume.</p>
+            ) : activities.slice(0, 4).map((activity) => (
+              <div key={activity.id} className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-3 hover:bg-gray-50 dark:hover:bg-[#141414] rounded-xl transition-colors border border-transparent hover:border-gray-100 dark:hover:border-gray-800">
+                <div className={`p-2.5 rounded-xl flex-shrink-0 ${activity.status === 'success' ? 'bg-[#2ECC71]/10 text-[#2ECC71]' : activity.status === 'warning' ? 'bg-[#FF9A3C]/10 text-[#FF9A3C]' : 'bg-blue-500/10 text-blue-500'}`}>
+                  {activity.type === 'resume_upload' ? <FileUp className="w-5 h-5" /> :
+                   activity.type === 'ats_analysis' ? <FileSearch className="w-5 h-5" /> :
+                   activity.type === 'interview_complete' ? <CheckCircle className="w-5 h-5" /> :
+                   activity.type === 'role_suggestion' ? <Target className="w-5 h-5" /> :
+                   activity.type === 'login' ? <LogIn className="w-5 h-5" /> :
+                   <Activity className="w-5 h-5" />}
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-text">{activity.title}</p>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{activity.title}</p>
                   <p className="text-xs text-gray-500 mt-0.5">{activity.description}</p>
-                  <p className="text-[10px] text-gray-400 mt-1">{formatTime(activity.timestamp)}</p>
+                  <p className="text-[10px] text-gray-400 mt-1 font-medium tracking-wide">{formatTime(activity.timestamp)}</p>
                 </div>
                 {activity.metadata?.score && (
-                  <Badge variant={activity.status === 'warning' ? 'warning' : 'success'} className="ml-auto flex-shrink-0 mt-2 sm:mt-0">Score: {activity.metadata.score}</Badge>
+                  <div className={`ml-auto flex-shrink-0 mt-2 sm:mt-0 px-3 py-1 rounded-full text-xs font-bold ${activity.status === 'warning' ? 'bg-[#FF9A3C]/10 text-[#FF9A3C]' : 'bg-[#2ECC71]/10 text-[#2ECC71]'}`}>
+                    Score: {activity.metadata.score}
+                  </div>
                 )}
               </div>
             ))}
@@ -203,18 +330,4 @@ export default function Dashboard() {
       </div>
     </div>
   );
-}
-
-// Inline icons for quick actions to avoid extra imports above
-function MessageSquareIcon(props) {
-  return <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>;
-}
-function BriefcaseIcon(props) {
-  return <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>;
-}
-function MailIcon(props) {
-  return <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>;
-}
-function StarIcon(props) {
-  return <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>;
 }

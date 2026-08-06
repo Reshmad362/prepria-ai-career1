@@ -543,7 +543,7 @@ function InterviewScreenComponent() {
     }
   };
 
-  const analyzeTranscript = (transcript, durationSec) => {
+  const analyzeTranscript = (question, transcript, durationSec) => {
     if (!transcript || transcript.trim().length === 0) {
        return {
           fillerWordsCount: 0,
@@ -605,6 +605,16 @@ function InterviewScreenComponent() {
     else if (starUsage < 50) suggestion = "You hit on some aspects of the STAR method; make sure to explicitly highlight the actual Result.";
     else suggestion = "Excellent use of structured, action-oriented storytelling.";
 
+    // Generate an Ideal Answer based on the question context
+    let idealAnswer = "An ideal response would directly address the core of the question using the STAR method. For example: 'In my previous role, we faced [Situation]. I was tasked with [Task]. I implemented [Action], which resulted in [Result].'";
+    if (question.toLowerCase().includes("tell me about yourself")) {
+       idealAnswer = "I am a driven professional with a background in this field. Most recently, I worked at [Company] where I led [Key Project/Initiative]. I specialize in [Core Skill], and I'm passionate about [Industry/Domain]. I'm looking to bring my expertise in [Skill] to this role to drive [Business Value].";
+    } else if (question.toLowerCase().includes("project")) {
+       idealAnswer = "A project I'm particularly proud of is [Project Name]. The goal was to solve [Problem]. I took the initiative to design [Solution architecture/Approach]. By collaborating with [Teams], we successfully delivered the project ahead of schedule, resulting in a [X]% increase in efficiency and [Y]% cost savings.";
+    } else if (question.toLowerCase().includes("weakness")) {
+       idealAnswer = "Early in my career, I found I sometimes took on too much at once. To address this, I started using rigid prioritization frameworks like Eisenhower matrices and time-blocking. As a result, I'm now highly organized and rarely miss deadlines, even under pressure.";
+    }
+
     return {
        fillerWordsCount: fillerCount,
        starUsage,
@@ -612,7 +622,8 @@ function InterviewScreenComponent() {
        confidenceScore,
        strengths,
        weaknesses,
-       suggestion
+       suggestion,
+       idealAnswer
     };
   };
 
@@ -650,7 +661,7 @@ function InterviewScreenComponent() {
       const durationSec = phaseStartTimeRef.current ? Math.round((processingStartTime - phaseStartTimeRef.current)/1000) : 0;
       const base64Video = await stopAndGetVideoBase64();
       
-      const stats = analyzeTranscript("", durationSec);
+      const stats = analyzeTranscript(currentQuestion.question, "", durationSec);
 
       const historyUpdate = [...conversationHistory, { 
         question: currentQuestion.question, 
@@ -763,7 +774,7 @@ function InterviewScreenComponent() {
      retryCountRef.current = 0; 
      
      // Run true analysis metrics
-     const stats = analyzeTranscript(finalAns, durationSec);
+     const stats = analyzeTranscript(currentQuestion.question, finalAns, durationSec);
 
      // 7. Save to conversation memory
      const historyUpdate = [...conversationHistory, { 

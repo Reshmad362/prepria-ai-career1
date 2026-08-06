@@ -3,6 +3,7 @@ import os
 import jwt
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
+import secrets
 from google.oauth2 import id_token
 from google.auth.transport import requests
 
@@ -106,3 +107,82 @@ def generate_token(user_id: str, email: str, name: str, picture: str = None):
             "picture": picture
         }
     }
+
+class OTPManager:
+    def __init__(self):
+        # Dictionary key: f"{email}_{purpose}"
+        self.store: Dict[str, Dict[str, Any]] = {}
+        self.cooldown_seconds = 30
+        self.max_attempts = 5
+        self.expires_minutes = 5
+
+    def _cleanup_expired(self):
+        now = datetime.utcnow()
+        expired_keys = [k for k, v in self.store.items() if now > v["expires_at"]]
+        for k in expired_keys:
+            del self.store[k]
+
+    def generate_otp(self, email: str, purpose: str = "LOGIN") -> Optional[str]:
+        self._cleanup_expired()
+        key = f"{email}_{purpose}"
+        now = datetime.utcnow()
+        
+        # Check cooldown
+        if key in self.store:
+            record = self.store[key]
+            time_since_generation = (now - record["generated_at"]).total_seconds()
+            if time_since_generation < self.cooldown_seconds:
+                raise ValueError(f"Please wait {int(self.cooldown_seconds - time_since_generation)} seconds before requesting a new OTP.")
+
+        # Check if user exists for specific purposes
+        if purpose in ["PASSWORD_RESET"]:
+            user_exists = any(u['email'] == email for u in users_db)
+            if not user_exists:
+                return None
+        
+        otp = str(secrets.randbelow(900000) + 100000)
+        expires_at = now + timedelta(minutes=self.expires_minutes)
+        
+        self.store[key] = {
+            "email": email,
+            "purpose": purpose,
+            "otp": otp,
+            "generated_at": now,
+            "expires_at": expires_at,
+            "attempts": 0,
+            "verified": False
+        }
+        return otp
+
+    def verify_otp(self, email: str, otp: str, purpose: str = "LOGIN") -> bool:
+        self._cleanup_expired()
+        key = f"{email}_{purpose}"
+        
+        record = self.store.get(key)
+        if not record:
+            return False
+            
+        # Check expiration
+        if datetime.utcnow() > record["expires_at"]:
+            del self.store[key]
+            return False
+            
+        # Check attempts
+        if record["attempts"] >= self.max_attempts:
+            del self.store[key]
+            return False
+            
+        if record["otp"] == otp:
+            record["verified"] = True
+            return True
+            
+        # Increment attempts on failure
+        record["attempts"] += 1
+        return False
+        
+    def delete_otp(self, email: str, purpose: str):
+        key = f"{email}_{purpose}"
+        if key in self.store:
+            del self.store[key]
+
+otp_manager = OTPManager()

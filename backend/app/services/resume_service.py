@@ -111,11 +111,27 @@ def generate_feedback(ats_data: Dict[str, Any], full_text: str) -> Dict[str, lis
         weaknesses.append("Tech stack could be more comprehensively listed.")
         suggestions.append("If applying for tech roles, specifically list core frameworks and technologies.")
         
+    # Grammar Analysis
+    grammar_score = 95
+    grammar_issues = []
+    if "responsable" in text_lower or "managerd" in text_lower:
+        grammar_score = 80
+        grammar_issues.append("Found spelling mistakes (e.g., 'responsable').")
+        
+    # Action Verbs
+    action_verbs = ["developed", "led", "managed", "created", "designed", "optimized", "implemented", "launched"]
+    verb_count = sum(1 for verb in action_verbs if verb in text_lower)
+    verb_feedback = "Strong use of action verbs." if verb_count >= 4 else "Consider starting bullet points with strong action verbs (e.g., Led, Developed, Optimized)."
+        
     return {
         "strengths": strengths,
         "weaknesses": weaknesses,
-        "suggestions": suggestions
+        "suggestions": suggestions,
+        "grammar_score": grammar_score,
+        "grammar_issues": grammar_issues,
+        "action_verbs_feedback": verb_feedback
     }
+
 
 async def process_resume_upload(file: UploadFile) -> Dict[str, Any]:
     # 1. Validate empty file upload

@@ -165,7 +165,7 @@ export default function TopNavbar() {
               setProfileOpen(!profileOpen);
               setNotificationsOpen(false);
             }}
-            className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-medium border border-indigo-200 dark:border-indigo-800 hover:ring-2 ring-indigo-500/30 transition-all cursor-pointer overflow-hidden"
+            className="w-8 h-8 rounded-full bg-[#FF6B00]/10 text-[#FF6B00] flex items-center justify-center font-medium border border-[#FF6B00]/20 hover:ring-2 ring-[#FF6B00]/30 transition-all cursor-pointer overflow-hidden"
           >
             {profile?.picture ? (
               <img src={profile.picture} alt="Profile" className="w-full h-full object-cover" />

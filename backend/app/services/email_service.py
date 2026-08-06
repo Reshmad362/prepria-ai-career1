@@ -1,6 +1,7 @@
 import os
 import smtplib
 import logging
+import traceback
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Dict, Any, List
@@ -8,12 +9,8 @@ from typing import Dict, Any, List
 logger = logging.getLogger(__name__)
 
 # Constants
-SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587
-RECIPIENTS = [
-    "1am23cs151@amceducation.in",
-    "1am23cs167@amceducation.in"
-]
+SMTP_SERVER = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
 
 def get_email_credentials():
     user = os.environ.get("EMAIL_USER")
@@ -43,7 +40,7 @@ def get_base_html(content: str) -> str:
                 box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             }}
             .header {{
-                background-color: #2563eb;
+                background-color: #111111;
                 color: #ffffff;
                 padding: 20px;
                 text-align: center;
@@ -51,6 +48,7 @@ def get_base_html(content: str) -> str:
             .header h1 {{
                 margin: 0;
                 font-size: 24px;
+                color: #FF7A00;
             }}
             .content {{
                 padding: 30px;
@@ -100,8 +98,8 @@ def get_base_html(content: str) -> str:
 
 def create_signup_template(data: Dict[str, Any]) -> str:
     content = f"""
-        <h2>New User Signup</h2>
-        <p>A new user has registered on the platform.</p>
+        <h2>Welcome to AI Career Platform!</h2>
+        <p>Your account has been successfully created.</p>
         <div class="data-row">
             <span class="label">Name:</span>
             <span class="value">{data.get('name', 'N/A')}</span>
@@ -110,25 +108,16 @@ def create_signup_template(data: Dict[str, Any]) -> str:
             <span class="label">Email:</span>
             <span class="value">{data.get('email', 'N/A')}</span>
         </div>
-        <div class="data-row">
-            <span class="label">Role Selected:</span>
-            <span class="value">{data.get('role', 'N/A')}</span>
-        </div>
-        <div class="data-row">
-            <span class="label">Time:</span>
-            <span class="value">{data.get('timestamp', 'N/A')}</span>
-        </div>
     """
     return get_base_html(content)
 
 def create_resume_template(data: Dict[str, Any]) -> str:
-    # Formatting skills nicely
     skills = data.get('skills', [])
     skills_str = ", ".join(skills) if isinstance(skills, list) else str(skills)
     
     content = f"""
         <h2>Resume Uploaded & Analyzed</h2>
-        <p>A user has uploaded a resume for ATS analysis.</p>
+        <p>We've successfully processed your resume for ATS analysis.</p>
         <div class="data-row">
             <span class="label">Filename:</span>
             <span class="value">{data.get('filename', 'N/A')}</span>
@@ -147,7 +136,7 @@ def create_resume_template(data: Dict[str, Any]) -> str:
 def create_interview_template(data: Dict[str, Any]) -> str:
     content = f"""
         <h2>Mock Interview Completed</h2>
-        <p>A user has completed a mock interview.</p>
+        <p>Your mock interview results are ready.</p>
         <div class="data-row">
             <span class="label">Role:</span>
             <span class="value">{data.get('role', 'N/A')}</span>
@@ -157,24 +146,8 @@ def create_interview_template(data: Dict[str, Any]) -> str:
             <span class="value" style="font-size: 1.2em; font-weight: bold; color: #2563eb;">{data.get('overallScore', 'N/A')}/10</span>
         </div>
         <div class="data-row">
-            <span class="label">Technical Score:</span>
-            <span class="value">{data.get('technicalScore', 'N/A')}/10</span>
-        </div>
-        <div class="data-row">
-            <span class="label">Communication Score:</span>
-            <span class="value">{data.get('communicationScore', 'N/A')}/10</span>
-        </div>
-        <div class="data-row">
             <span class="label">AI Summary:</span>
             <span class="value">{data.get('summary', 'N/A')}</span>
-        </div>
-        <div class="data-row">
-            <span class="label">Weak Areas:</span>
-            <span class="value">{data.get('weakAreas', 'N/A')}</span>
-        </div>
-        <div class="data-row">
-            <span class="label">Recommended Courses:</span>
-            <span class="value">{data.get('recommendedCourses', 'N/A')}</span>
         </div>
     """
     return get_base_html(content)
@@ -182,7 +155,7 @@ def create_interview_template(data: Dict[str, Any]) -> str:
 def create_course_template(data: Dict[str, Any]) -> str:
     content = f"""
         <h2>Course Completed</h2>
-        <p>A user has completed a course.</p>
+        <p>Congratulations on completing the course!</p>
         <div class="data-row">
             <span class="label">Course Name:</span>
             <span class="value">{data.get('courseName', 'N/A')}</span>
@@ -191,25 +164,13 @@ def create_course_template(data: Dict[str, Any]) -> str:
             <span class="label">Completion Percentage:</span>
             <span class="value">{data.get('completionPercentage', '100')}%</span>
         </div>
-        <div class="data-row">
-            <span class="label">Certificate ID:</span>
-            <span class="value">{data.get('certificateId', 'N/A')}</span>
-        </div>
-        <div class="data-row">
-            <span class="label">Completion Date:</span>
-            <span class="value">{data.get('completionDate', 'N/A')}</span>
-        </div>
     """
     return get_base_html(content)
 
 def create_certificate_template(data: Dict[str, Any]) -> str:
     content = f"""
         <h2>Certificate Generated</h2>
-        <p>A certificate has been successfully generated.</p>
-        <div class="data-row">
-            <span class="label">Course Details:</span>
-            <span class="value">{data.get('courseDetails', 'N/A')}</span>
-        </div>
+        <p>Your certificate is ready to download.</p>
         <div class="data-row">
             <span class="label">Certificate ID:</span>
             <span class="value">{data.get('certificateId', 'N/A')}</span>
@@ -221,6 +182,29 @@ def create_certificate_template(data: Dict[str, Any]) -> str:
     """
     return get_base_html(content)
 
+def create_otp_template(data: Dict[str, Any]) -> str:
+    otp = data.get('otp', '000000')
+    purpose = data.get('purpose', 'LOGIN')
+    
+    title = "Verify Your Login"
+    desc = "We received a request to log in to your AI Career Intelligence Platform account."
+    
+    if purpose == "PASSWORD_RESET":
+        title = "Reset Your Password"
+        desc = "We received a request to reset your password for your AI Career Intelligence Platform account."
+        
+    content = f"""
+        <h2>{title}</h2>
+        <p>{desc}</p>
+        <div style="margin: 30px 0; padding: 20px; background-color: #f8fafc; border-radius: 8px; text-align: center;">
+            <p class="label" style="margin-bottom: 10px;">Your Verification Code:</p>
+            <div style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #FF7A00;">{otp}</div>
+        </div>
+        <p style="color: #64748b; font-size: 14px;">This code will expire in <strong>5 minutes</strong>.</p>
+        <p style="color: #64748b; font-size: 14px;">If you didn't request this code, you can safely ignore this email.</p>
+    """
+    return get_base_html(content)
+
 def send_notification_email(subject: str, event_type: str, data: Dict[str, Any]) -> bool:
     """
     Sends an email notification for a specific event type.
@@ -228,10 +212,14 @@ def send_notification_email(subject: str, event_type: str, data: Dict[str, Any])
     user, password = get_email_credentials()
     
     if not user or not password:
-        logger.error("EMAIL_USER or EMAIL_PASS not set in environment variables.")
+        logger.error("EMAIL_USER or EMAIL_PASS not set in environment variables. Email service disabled.")
         return False
 
-    # Generate HTML content based on event type
+    recipient_email = data.get("email")
+    if not recipient_email:
+        logger.error(f"Missing recipient 'email' in data for event: {event_type}. Cannot send email.")
+        return False
+
     html_content = ""
     if event_type == "signup":
         html_content = create_signup_template(data)
@@ -243,6 +231,8 @@ def send_notification_email(subject: str, event_type: str, data: Dict[str, Any])
         html_content = create_course_template(data)
     elif event_type == "certificate":
         html_content = create_certificate_template(data)
+    elif event_type == "otp":
+        html_content = create_otp_template(data)
     else:
         logger.error(f"Unknown email event type: {event_type}")
         return False
@@ -250,20 +240,31 @@ def send_notification_email(subject: str, event_type: str, data: Dict[str, Any])
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = f"AI Career Platform <{user}>"
-    msg["To"] = ", ".join(RECIPIENTS)
+    msg["To"] = recipient_email
 
-    # Attach HTML content
     part = MIMEText(html_content, "html")
     msg.attach(part)
 
     try:
-        logger.info(f"Connecting to SMTP server to send email for {event_type}...")
+        logger.info(f"Establishing SMTP connection to {SMTP_SERVER}:{SMTP_PORT}...")
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.set_debuglevel(1)  # Enable SMTP debug logging
+            
+            logger.info("Starting TLS...")
             server.starttls()
+            
+            logger.info("Attempting SMTP login...")
             server.login(user, password)
+            logger.info("SMTP login successful.")
+            
+            logger.info(f"Sending message to {recipient_email}...")
             server.send_message(msg)
-        logger.info(f"Email sent successfully for event: {event_type}")
+            
+        logger.info(f"Email sent successfully to {recipient_email} for event: {event_type}")
         return True
+    except smtplib.SMTPAuthenticationError as auth_err:
+        logger.error(f"SMTP Authentication Error: The EMAIL_USER or EMAIL_PASS is invalid, or an App Password is required. Details: {str(auth_err)}")
+        return False
     except Exception as e:
-        logger.error(f"Failed to send email for {event_type}: {str(e)}")
+        logger.error(f"Failed to send email to {recipient_email} for {event_type}. Exception details:\n{traceback.format_exc()}")
         return False

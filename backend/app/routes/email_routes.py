@@ -21,7 +21,7 @@ async def send_email(payload: EmailPayload, background_tasks: BackgroundTasks):
     logger.info(f"Received email request for event: {payload.event_type}")
     
     # Check if event_type is valid
-    valid_events = ["signup", "resume_upload", "interview", "course_completion", "certificate"]
+    valid_events = ["signup", "resume_upload", "interview", "course_completion", "certificate", "otp"]
     if payload.event_type not in valid_events:
         raise HTTPException(status_code=400, detail=f"Invalid event type. Must be one of {valid_events}")
 

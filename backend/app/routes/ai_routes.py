@@ -3,6 +3,7 @@ from pydantic import BaseModel
 import re
 from typing import List, Optional
 from app.services.interview_engine import generate_next_question, analyze_answer
+from app.services.roadmap_service import generate_career_roadmap
 
 router = APIRouter()
 
@@ -81,3 +82,14 @@ class InterviewAnalyzeRequest(BaseModel):
 def analyze_interview_answer(req: InterviewAnalyzeRequest):
     result = analyze_answer(req.transcript, req.question)
     return result
+
+class RoadmapRequest(BaseModel):
+    user_id: str
+    targetRole: str = "Software Engineer"
+    skills: List[str] = []
+    experienceLevel: str = "Fresher"
+
+@router.post("/generate-roadmap")
+def get_career_roadmap(req: RoadmapRequest):
+    roadmap = generate_career_roadmap(req.dict())
+    return {"success": True, "data": roadmap}

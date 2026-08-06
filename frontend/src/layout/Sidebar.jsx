@@ -1,17 +1,18 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, FileUp, FileSearch, Target, MessageSquare, BarChart2, TrendingUp, LifeBuoy, BookOpen, Briefcase } from 'lucide-react';
+import { LayoutDashboard, FileSearch, MessageSquare, BarChart2, LifeBuoy, BookOpen, Briefcase, UserCircle, Settings, Files, Map } from 'lucide-react';
 
 const navItems = [
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-  { name: 'My Courses', path: '/my-courses', icon: BookOpen },
-  { name: 'Resume Upload', path: '/resume-upload', icon: FileUp },
-  { name: 'ATS Dashboard', path: '/ats-dashboard', icon: FileSearch },
-  { name: 'Role Suggestions', path: '/role-suggestions', icon: Target },
-  { name: 'Role Interviews', path: '/role-interviews', icon: Briefcase },
-  { name: 'Mock Interview', path: '/mock-interview', icon: MessageSquare },
-  { name: 'Evaluation Dashboard', path: '/evaluation', icon: BarChart2 },
-  { name: 'Progress Tracker', path: '/progress', icon: TrendingUp },
+  { name: 'My Profile', path: '/profile', icon: UserCircle },
+  { name: 'Document Center', path: '/document-center', icon: Files },
+  { name: 'Resume Intelligence', path: '/resume-upload', icon: FileSearch },
+  { name: 'Career Roadmap', path: '/career-roadmap', icon: Map },
+  { name: 'AI Mock Interviews', path: '/mock-interview', icon: MessageSquare },
+  { name: 'AI Learning Hub', path: '/my-courses', icon: BookOpen },
+  { name: 'Progress Analytics', path: '/progress', icon: BarChart2 },
+  { name: 'Job Board', path: '/jobs', icon: Briefcase },
+  { name: 'Settings', path: '/preferences', icon: Settings },
   { name: 'Support', path: '/support', icon: LifeBuoy },
 ];
 
@@ -19,10 +20,10 @@ export default function Sidebar() {
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-card border-r border-border p-4 flex flex-col">
       <div className="flex items-center gap-3 px-2 mb-8 mt-2">
-        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-          <span className="text-white font-bold text-xl">A</span>
+        <div className="w-8 h-8 rounded-lg bg-[#FF6B00] flex items-center justify-center shadow-md shadow-[#FF6B00]/20">
+          <span className="text-white font-bold text-xl font-poppins">A</span>
         </div>
-        <span className="text-lg font-bold text-text">AI CareerPlatform</span>
+        <span className="text-lg font-bold text-text font-poppins">AI Career</span>
       </div>
       
       <nav className="flex-1 space-y-1">

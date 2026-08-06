@@ -1,26 +1,28 @@
 import React, { useState, useContext } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import Card from '../components/Card';
-import Button from '../components/Button';
-import { Mail, Lock, ArrowRight, ShieldCheck, Loader2 } from 'lucide-react';
-import { logActivity } from '../utils/activityLogger';
+import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { UserContext } from '../contexts/UserContext';
+import { logActivity } from '../utils/activityLogger';
+import AuthLayout from '../components/AuthLayout';
+import AuthCard from '../components/AuthCard';
+import LoadingButton from '../components/LoadingButton';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export default function Login() {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({ email: '', password: '' });
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const { setUserContext } = useContext(UserContext);
+  
+  const [formData, setFormData] = useState({ email: '', password: '', rememberMe: false });
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [isOtpFlow, setIsOtpFlow] = useState(false);
 
   const handleLoginSuccess = (userData, token) => {
     localStorage.removeItem('isDemo');
-    
     localStorage.setItem('token', token);
-    
-    // Pass the full user object to the context
     setUserContext(userData);
     window.dispatchEvent(new Event('storage'));
     
@@ -41,7 +43,7 @@ export default function Login() {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handlePasswordLogin = async (e) => {
     e.preventDefault();
     if (!formData.email || !formData.password) {
       setError('Please fill in all fields');
@@ -59,30 +61,19 @@ export default function Login() {
 
     try {
       const trimmedEmail = formData.email.trim().toLowerCase();
-      console.log("Entered email:", trimmedEmail);
-
       let foundUser = null;
       let tokenToUse = "local-token-" + Date.now();
 
-      // Attempt Backend Login First
       try {
         const response = await fetch(`${API_URL}/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: trimmedEmail,
-            password: formData.password
-          })
+          body: JSON.stringify({ email: trimmedEmail, password: formData.password })
         });
-
         const data = await response.json();
         
         if (response.ok && data.success) {
            tokenToUse = data.access_token || tokenToUse;
-           // The backend doesn't return full profile in /login currently (just token details).
-           // But we need the profile for Context. Let's still look it up locally if we need to,
-           // or construct it. For now, we will fallback to the local storage search to get the full profile object, 
-           // since the backend /login just validates.
            const users = JSON.parse(localStorage.getItem("users")) || [];
            foundUser = users.find((u) => u.email.trim().toLowerCase() === trimmedEmail) || {
               email: trimmedEmail,
@@ -93,12 +84,8 @@ export default function Login() {
            throw new Error(data.detail || "Backend login failed");
         }
       } catch (backendErr) {
-        console.warn("Backend login failed or unreachable, falling back to local storage:", backendErr.message);
-        
-        // Fallback to local storage
+        console.warn("Backend login failed, falling back to local storage:", backendErr.message);
         const users = JSON.parse(localStorage.getItem("users")) || [];
-        console.log("Stored users:", users);
-
         foundUser = users.find(
           (u) => u.email.trim().toLowerCase() === trimmedEmail && u.password === formData.password
         );
@@ -118,8 +105,6 @@ export default function Login() {
       localStorage.removeItem("profile");
 
       localStorage.setItem("activeUser", foundUser.email);
-      console.log("Logged in user:", foundUser.email);
-      
       handleLoginSuccess(foundUser, tokenToUse);
     } catch (err) {
       setError(err.message || 'An error occurred during login');
@@ -128,30 +113,80 @@ export default function Login() {
     }
   };
 
+  const handleOtpLoginRequest = async (e) => {
+    e.preventDefault();
+    if (!formData.email) {
+      setError('Please enter your email address to login with OTP');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const trimmedEmail = formData.email.trim().toLowerCase();
+      
+      const response = await fetch(`${API_URL}/auth/generate-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: trimmedEmail, purpose: 'LOGIN' })
+      });
+
+      const data = await response.json();
+      
+      if (response.ok) {
+        navigate('/otp-verification', { state: { email: trimmedEmail, purpose: 'LOGIN' } });
+      } else {
+        throw new Error(data.detail || "Failed to generate OTP");
+      }
+    } catch (err) {
+      setError(err.message || 'An error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12">
-      <Card className="w-full max-w-md p-8 shadow-xl border-t-4 border-t-primary" animate={false}>
-        <div className="text-center mb-8">
-          <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <ShieldCheck className="w-6 h-6 text-primary" />
-          </div>
-          <h1 className="text-3xl font-bold text-text mb-2">Welcome Back</h1>
-          <p className="text-gray-500">Sign in to access your intelligence dashboard</p>
+    <AuthLayout>
+      <AuthCard>
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-[#111111] mb-1">
+            {isOtpFlow ? "Login with OTP" : "Welcome Back"}
+          </h2>
+          <p className="text-gray-500 text-sm">
+            {isOtpFlow ? "Enter your email to receive a verification code." : "Continue your interview journey."}
+          </p>
         </div>
 
-        {error && <div className="mb-6 p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm rounded-lg text-center font-medium animate-pulse">{error}</div>}
+        <AnimatePresence mode="wait">
+          {error && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mb-6 p-3 bg-red-50 text-red-600 text-sm rounded-lg text-center font-medium border border-red-100"
+            >
+              {error}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={isOtpFlow ? handleOtpLoginRequest : handlePasswordLogin} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-text mb-1">Email</label>
+            <label className="block text-sm font-semibold text-[#111111] mb-1.5">Email Address</label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                 <Mail className="h-5 w-5 text-gray-400" />
               </div>
               <input
                 type="email"
-                className="block w-full pl-10 pr-3 py-2.5 border border-border rounded-lg bg-card text-text focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all disabled:opacity-50"
+                className="block w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl bg-gray-50 text-[#111111] focus:bg-white focus:ring-2 focus:ring-[#FF7A00]/20 focus:border-[#FF7A00] transition-all disabled:opacity-50"
                 placeholder="you@example.com"
                 value={formData.email}
                 onChange={(e) => setFormData({...formData, email: e.target.value})}
@@ -160,43 +195,94 @@ export default function Login() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-text mb-1">Password</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Lock className="h-5 w-5 text-gray-400" />
-              </div>
-              <input
-                type="password"
-                className="block w-full pl-10 pr-3 py-2.5 border border-border rounded-lg bg-card text-text focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all disabled:opacity-50"
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={(e) => setFormData({...formData, password: e.target.value})}
-                disabled={isLoading}
-              />
-            </div>
-          </div>
+          <AnimatePresence>
+            {!isOtpFlow && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="pt-2 pb-1">
+                  <div className="flex justify-between items-center mb-1.5">
+                    <label className="block text-sm font-semibold text-[#111111]">Password</label>
+                    <Link to="/forgot-password" className="text-xs font-semibold text-[#FF7A00] hover:text-[#E66D00] transition-colors">
+                      Forgot Password?
+                    </Link>
+                  </div>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                      <Lock className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      className="block w-full pl-11 pr-11 py-3 border border-gray-200 rounded-xl bg-gray-50 text-[#111111] focus:bg-white focus:ring-2 focus:ring-[#FF7A00]/20 focus:border-[#FF7A00] transition-all disabled:opacity-50"
+                      placeholder="••••••••"
+                      value={formData.password}
+                      onChange={(e) => setFormData({...formData, password: e.target.value})}
+                      disabled={isLoading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-gray-400 hover:text-gray-600 transition-colors focus:outline-none"
+                    >
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
+                </div>
 
-          <div className="flex justify-end">
-            <Link to="/forgot-password" className="text-xs text-primary font-medium hover:underline">Forgot password?</Link>
-          </div>
-
-          <Button type="submit" disabled={isLoading} className="w-full flex justify-center items-center gap-2 mt-6 py-2.5">
-            {isLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <>Sign In <ArrowRight className="w-4 h-4" /></>
+                <div className="flex items-center mt-4">
+                  <input
+                    id="remember-me"
+                    type="checkbox"
+                    className="h-4 w-4 text-[#FF7A00] focus:ring-[#FF7A00] border-gray-300 rounded cursor-pointer"
+                    checked={formData.rememberMe}
+                    onChange={(e) => setFormData({...formData, rememberMe: e.target.checked})}
+                    disabled={isLoading}
+                  />
+                  <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-600 cursor-pointer select-none">
+                    Remember me for 30 days
+                  </label>
+                </div>
+              </motion.div>
             )}
-          </Button>
+          </AnimatePresence>
+
+          <div className="pt-4">
+            <LoadingButton type="submit" isLoading={isLoading}>
+              {isOtpFlow ? 'Continue with OTP' : 'Login'}
+            </LoadingButton>
+          </div>
         </form>
 
-        <div className="mt-8 text-center text-sm text-gray-500">
+        <div className="relative my-8">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-200"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-3 bg-white text-gray-500 font-medium">OR</span>
+          </div>
+        </div>
+
+        <div>
+          <LoadingButton 
+            variant="outline" 
+            type="button" 
+            onClick={() => setIsOtpFlow(!isOtpFlow)}
+            disabled={isLoading}
+          >
+            {isOtpFlow ? 'Login with Password' : 'Login using OTP'}
+          </LoadingButton>
+        </div>
+
+        <div className="mt-8 text-center text-sm text-gray-600">
           Don't have an account?{' '}
-          <Link to="/signup" className="text-primary font-bold hover:underline">
+          <Link to="/signup" className="text-[#FF7A00] font-semibold hover:underline">
             Sign up here
           </Link>
         </div>
-      </Card>
-    </div>
+      </AuthCard>
+    </AuthLayout>
   );
 }

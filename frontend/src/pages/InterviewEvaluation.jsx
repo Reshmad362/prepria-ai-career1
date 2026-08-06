@@ -96,7 +96,7 @@ export default function InterviewEvaluation() {
           { label: 'Answer Quality', value: metrics.content + '%', icon: CheckCircle, color: 'text-green-500' },
           { label: 'Confidence & Pace', value: metrics.confidence + '%', icon: TrendingUp, color: 'text-purple-500' },
           { label: 'STAR Methodology', value: metrics.starUsage + '%', icon: BarChart3, color: 'text-blue-500' },
-          { label: 'Filler Words', value: metrics.totalFillers, icon: AlertTriangle, color: 'text-orange-500' },
+          { label: 'Focus Score', value: metrics.focus + '%', icon: ShieldIcon, color: 'text-teal-500' },
         ].map((kpi, idx) => (
           <motion.div key={idx} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }} className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
              <kpi.icon className={`w-6 h-6 mb-3 ${kpi.color}`} />
@@ -179,13 +179,23 @@ export default function InterviewEvaluation() {
                               <Clock className="w-3 h-3"/> {res.duration}s
                            </div>
                          )}
-                       </div>
-                       
                        <div className="p-5 flex-1 bg-white dark:bg-slate-800 flex flex-col">
-                           <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Transcript</h4>
-                           <p className="text-sm text-slate-700 dark:text-slate-300 italic mb-4">
-                             {res.answerTranscript ? `"${res.answerTranscript}"` : "[No vocal response detected]"}
-                           </p>
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 flex-1">
+                               <div>
+                                   <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Your Transcript</h4>
+                                   <p className="text-sm text-slate-700 dark:text-slate-300 italic">
+                                     {res.answerTranscript ? `"${res.answerTranscript}"` : "[No vocal response detected]"}
+                                   </p>
+                               </div>
+                               <div className="bg-blue-50/50 dark:bg-blue-900/10 p-3 rounded-xl border border-blue-100 dark:border-blue-900/30">
+                                   <h4 className="text-xs font-bold text-blue-500 uppercase tracking-wider mb-2 flex items-center gap-1">
+                                       <ShieldIcon className="w-3 h-3" /> Ideal AI Answer
+                                   </h4>
+                                   <p className="text-sm text-slate-700 dark:text-slate-300">
+                                     {res.idealAnswer || "An ideal response would directly address the core of the question using the STAR method."}
+                                   </p>
+                               </div>
+                           </div>
                            
                            {res.status === 'answered' && (
                              <div className="grid grid-cols-2 gap-2 mt-auto">

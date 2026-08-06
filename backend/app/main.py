@@ -1,3 +1,10 @@
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes.resume_routes import router as resume_router
@@ -14,7 +21,8 @@ except Exception:
 from app.routes.career_routes import router as career_router
 from app.routes.ai_routes import router as ai_router
 from app.routes.email_routes import router as email_router
-
+from app.routes.document_routes import router as document_router
+from app.routes.job_routes import router as job_router
 app = FastAPI(title="AI Career Intelligence Platform")
 
 app.include_router(audio_router)
@@ -36,6 +44,8 @@ if emotion_router: app.include_router(emotion_router)
 app.include_router(career_router)
 app.include_router(ai_router, prefix="/ai", tags=["ai"])
 app.include_router(email_router, prefix="/email", tags=["email"])
+app.include_router(document_router)
+app.include_router(job_router)
 
 @app.get("/health")
 def health():

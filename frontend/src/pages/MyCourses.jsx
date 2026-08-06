@@ -239,60 +239,90 @@ export default function MyCourses() {
     'leadership': 'Leadership', 'emotional intelligence': 'Emotional Intelligence', 'conflict': 'Emotional Intelligence'
   }), []);
 
-  const smartRecommendations = useMemo(() => {
-    let recommendationsMap = new Map();
+  const swimlanes = useMemo(() => {
+    const lanes = [];
 
-    const processMatches = (items, badgeType, badgeIcon, badgeColor) => {
-      if (!items || !Array.isArray(items)) return;
-      items.forEach(item => {
-        const lowerItem = item.toLowerCase();
+    // Helper to find courses by keywords
+    const getCoursesByKeywords = (keywords, excludeIds = new Set()) => {
+      const matches = new Map();
+      if (!keywords || !Array.isArray(keywords)) return [];
+      
+      keywords.forEach(kw => {
+        const lowerKw = kw.toLowerCase();
         for (const [key, category] of Object.entries(categoryMap)) {
-          if (lowerItem.includes(key)) {
-            // Find all courses in this category
+          if (lowerKw.includes(key) || key.includes(lowerKw)) {
             processedCourses.forEach(course => {
-              if (course.category === category && !recommendationsMap.has(course.id)) {
-                recommendationsMap.set(course.id, {
-                  ...course,
-                  badgeType,
-                  badgeIcon,
-                  badgeColor
-                });
+              if (course.category === category && !excludeIds.has(course.id)) {
+                matches.set(course.id, course);
               }
             });
           }
         }
       });
+      return Array.from(matches.values());
     };
 
-    // 1. Weak Areas -> 💡 Recommended to improve
-    if (insights?.weakAreas) {
-      processMatches(insights.weakAreas, "Recommended to improve", Lightbulb, "from-yellow-400 to-amber-500");
+    const usedIds = new Set();
+
+    // 1. Weak Areas (Focus Areas)
+    if (insights?.weakAreas && insights.weakAreas.length > 0) {
+      const weakCourses = getCoursesByKeywords(insights.weakAreas, usedIds).slice(0, 6);
+      if (weakCourses.length > 0) {
+        lanes.push({
+          title: "Improve Your Focus Areas",
+          icon: Lightbulb,
+          color: "text-yellow-500",
+          courses: weakCourses
+        });
+        weakCourses.forEach(c => usedIds.add(c.id));
+      }
     }
 
-    // 2. Profile Skills -> 🎯 Based on your profile
-    if (profile?.skills) {
-      processMatches(profile.skills, "Based on your profile", Target, "from-indigo-500 to-purple-500");
+    // 2. Based on Profile / Role
+    let roleKeywords = [];
+    if (preferences?.targetRole) roleKeywords.push(preferences.targetRole);
+    if (profile?.skills) roleKeywords.push(...profile.skills);
+    
+    if (roleKeywords.length > 0) {
+      const roleCourses = getCoursesByKeywords(roleKeywords, usedIds).slice(0, 6);
+      if (roleCourses.length > 0) {
+        lanes.push({
+          title: "Recommended For You",
+          icon: Target,
+          color: "text-purple-500",
+          courses: roleCourses
+        });
+        roleCourses.forEach(c => usedIds.add(c.id));
+      }
     }
 
-    // 3. Target Role -> 🎯 Based on your profile
-    if (preferences?.targetRole) {
-      processMatches([preferences.targetRole], "Based on your profile", Target, "from-indigo-500 to-purple-500");
+    // 3. Domain specific trending
+    if (selectedDomain) {
+      const domainCrs = processedCourses.filter(c => c.domain === selectedDomain && !usedIds.has(c.id)).slice(0, 6);
+      if (domainCrs.length > 0) {
+        lanes.push({
+          title: `Trending in ${selectedDomain.charAt(0).toUpperCase() + selectedDomain.slice(1)}`,
+          icon: Flame,
+          color: "text-orange-500",
+          courses: domainCrs
+        });
+        domainCrs.forEach(c => usedIds.add(c.id));
+      }
     }
 
-    let recommendedList = Array.from(recommendationsMap.values());
-
-    // Fallback if empty -> 🔥 Trending
-    if (recommendedList.length === 0) {
-      recommendedList = processedCourses.slice(0, 4).map(course => ({
-        ...course,
-        badgeType: "Trending",
-        badgeIcon: Flame,
-        badgeColor: "from-orange-500 to-red-500"
-      }));
+    // 4. Just added / Top Rated (Fallback)
+    const topRated = processedCourses.filter(c => !usedIds.has(c.id)).slice(0, 8);
+    if (topRated.length > 0) {
+      lanes.push({
+        title: "Top Rated Courses",
+        icon: Award,
+        color: "text-blue-500",
+        courses: topRated
+      });
     }
 
-    return recommendedList.slice(0, 4); // Limit to top 4 recommendations
-  }, [profile, preferences, insights, categoryMap]);
+    return lanes;
+  }, [profile, preferences, insights, categoryMap, processedCourses, selectedDomain]);
 
   const filteredCourses = useMemo(() => {
     // Search Mode: Filter across ALL processed courses
@@ -461,17 +491,17 @@ export default function MyCourses() {
           </div>
         )}
 
-          {/* SECTION HEADERS (MAIN CATEGORY) / SEARCH RESULTS */}
-          <div className="flex flex-col gap-8 mb-8">
+          {/* SWIMLANES (Netflix Style) */}
+          <div className="flex flex-col gap-10 mb-12">
             {searchQuery.trim() !== '' ? (
-              <div className="mt-2 mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+              <div className="animate-in fade-in slide-in-from-top-4 duration-500">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
                   <Search className="w-5 h-5 text-purple-500" /> Search Results for "{searchQuery}"
                 </h2>
                 {filteredCourses.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {filteredCourses.map(course => (
-                      <div key={course.id} className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 border border-border flex flex-col h-full relative overflow-hidden group">
+                      <div key={course.id} className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 border border-border flex flex-col h-full relative overflow-hidden group cursor-pointer" onClick={() => navigate(`/courses/${course.id}`)}>
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-blue-500 transform origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-300"></div>
                         <div className="flex justify-between items-start mb-4">
                           <div className="flex gap-2">
@@ -487,10 +517,7 @@ export default function MyCourses() {
                           <span className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
                             <Clock className="w-4 h-4 text-purple-500" /> {course.duration}
                           </span>
-                          <button 
-                            onClick={() => navigate(`/courses/${course.id}`)}
-                            className="px-4 py-2 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-900/40 text-purple-700 dark:text-purple-300 font-bold rounded-xl transition-colors text-sm"
-                          >
+                          <button className="px-4 py-2 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-900/40 text-purple-700 dark:text-purple-300 font-bold rounded-xl transition-colors text-sm">
                             View Details
                           </button>
                         </div>
@@ -506,71 +533,42 @@ export default function MyCourses() {
                 )}
               </div>
             ) : (
-              Object.entries(visibleFilterGroups).map(([groupName, items]) => {
-                const isActiveGroup = items.includes(activeInterest);
-                return (
-                  <div key={groupName} className="mb-2">
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                      <BookOpen className="w-5 h-5 text-purple-500" /> Explore {groupName}
-                    </h2>
-                    <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                      {items.map(sub => (
-                        <button
-                          key={sub}
-                          onClick={() => setActiveInterest(sub)}
-                          className={`shrink-0 px-5 py-2.5 rounded-full text-sm font-bold transition-all ${
-                            activeInterest === sub 
-                            ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-md hover:scale-105' 
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 hover:scale-105 shadow-sm'
-                          }`}
-                        >
-                          {sub}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* PHASE 3 & 4 — REVEAL COURSES ONLY WHEN CLICKED */}
-                    {isActiveGroup && activeInterest !== 'All' && (
-                      <div className="mt-6 mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
-                        {filteredCourses.length > 0 ? (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                            {filteredCourses.map(course => (
-                              <div key={course.id} className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 border border-border flex flex-col h-full relative overflow-hidden group">
-                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-blue-500 transform origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-300"></div>
-                                <div className="flex justify-between items-start mb-4">
-                                  <div className="flex gap-2">
-                                    <span className="px-3 py-1 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-purple-100 dark:border-purple-800">{course.category}</span>
-                                    {course.status === 'completed' && <span className="px-2 py-1 bg-green-100 text-green-700 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/> Completed</span>}
-                                    {course.status === 'in-progress' && <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center gap-1"><Clock className="w-3 h-3"/> {course.progressPercentage}%</span>}
-                                  </div>
-                                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-md">{course.level}</span>
-                                </div>
-                                <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-2 line-clamp-2 group-hover:text-purple-600 transition-colors">{course.title}</h3>
-                                <p className="text-sm text-gray-500 mb-6 flex-1 line-clamp-3">{course.description}</p>
-                                <div className="flex items-center justify-between mt-auto pt-4 border-t border-border">
-                                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
-                                    <Clock className="w-4 h-4 text-purple-500" /> {course.duration}
-                                  </span>
-                                  <button 
-                                    onClick={() => navigate(`/courses/${course.id}`)}
-                                    className="px-4 py-2 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-900/40 text-purple-700 dark:text-purple-300 font-bold rounded-xl transition-colors text-sm"
-                                  >
-                                    View Details
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
+              swimlanes.map((lane, idx) => (
+                <div key={idx} className="relative group animate-in fade-in duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
+                  <h2 className="text-xl font-extrabold text-gray-900 dark:text-white mb-4 flex items-center gap-2 px-2">
+                    <lane.icon className={`w-6 h-6 ${lane.color}`} /> {lane.title}
+                  </h2>
+                  <div className="flex gap-6 overflow-x-auto pb-6 scrollbar-hide snap-x px-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                    {lane.courses.map(course => (
+                      <div 
+                        key={course.id} 
+                        onClick={() => navigate(`/courses/${course.id}`)}
+                        className="snap-start shrink-0 w-80 bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-700 flex flex-col h-full relative overflow-hidden cursor-pointer group/card hover:-translate-y-1"
+                      >
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-blue-500 transform origin-left scale-x-0 group-hover/card:scale-x-100 transition-transform duration-300"></div>
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="flex gap-2">
+                            <span className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-[10px] font-bold uppercase tracking-wider">{course.category}</span>
+                            {course.status === 'completed' && <span className="px-2 py-1 bg-green-100 text-green-700 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/> Completed</span>}
                           </div>
-                        ) : (
-                          <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-2xl border border-border shadow-sm">
-                            <p className="text-gray-500 max-w-md mx-auto">Courses for this topic are being added soon.</p>
+                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{course.level}</span>
+                        </div>
+                        <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-2 line-clamp-2 group-hover/card:text-purple-600 transition-colors">{course.title}</h3>
+                        <p className="text-sm text-gray-500 mb-6 flex-1 line-clamp-2">{course.description}</p>
+                        
+                        <div className="flex items-center justify-between mt-auto pt-4 border-t border-gray-100 dark:border-gray-700">
+                          <span className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
+                            <Clock className="w-4 h-4 text-purple-500" /> {course.duration}
+                          </span>
+                          <div className="w-8 h-8 rounded-full bg-purple-50 dark:bg-purple-900/20 text-purple-600 flex items-center justify-center group-hover/card:bg-purple-500 group-hover/card:text-white transition-colors">
+                            <PlayCircle className="w-5 h-5" />
                           </div>
-                        )}
+                        </div>
                       </div>
-                    )}
+                    ))}
                   </div>
-                );
-              })
+                </div>
+              ))
             )}
           </div>
         </div>
