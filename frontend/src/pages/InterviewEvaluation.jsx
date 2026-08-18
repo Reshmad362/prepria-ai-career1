@@ -179,7 +179,8 @@ export default function InterviewEvaluation() {
                               <Clock className="w-3 h-3"/> {res.duration}s
                            </div>
                          )}
-                       <div className="p-5 flex-1 bg-white dark:bg-slate-800 flex flex-col">
+                        </div>
+                        <div className="p-5 flex-1 bg-white dark:bg-slate-800 flex flex-col">
                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 flex-1">
                                <div>
                                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Your Transcript</h4>

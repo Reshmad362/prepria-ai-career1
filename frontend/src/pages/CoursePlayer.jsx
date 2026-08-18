@@ -601,6 +601,7 @@ export default function CoursePlayer() {
                 </div>
               )}
             </div>
+          </div>
 
           </motion.div>
         ) : (

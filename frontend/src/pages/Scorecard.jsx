@@ -9,7 +9,7 @@ import {
 } from 'recharts';
 import { TrendingUp, Target, BrainCircuit, Activity, BarChart2, Briefcase } from 'lucide-react';
 
-const COLORS = ['#FF6B00', '#10B981', '#3B82F6', '#8B5CF6', '#F59E0B'];
+const COLORS = ['#E97862', '#22C55E', '#3B82F6', '#8B5CF6', '#F59E0B'];
 
 export default function Scorecard() {
   const { profile } = useContext(UserContext);
@@ -78,7 +78,7 @@ export default function Scorecard() {
               onClick={() => setTimeRange(range)}
               className={`px-4 py-1.5 rounded-md text-sm font-bold transition-colors ${
                 timeRange === range 
-                  ? 'bg-white dark:bg-gray-700 text-[#FF6B00] shadow-sm' 
+                  ? 'bg-white dark:bg-gray-700 text-primary shadow-sm' 
                   : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
               }`}
             >
@@ -148,10 +148,10 @@ export default function Scorecard() {
 
         {/* ATS Score Trend (Bar Chart) */}
         <Card className="h-96 flex flex-col border-0 shadow-lg relative overflow-hidden">
-          <div className="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-[#FF6B00]/5 to-transparent pointer-events-none"></div>
+          <div className="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-primary/5 to-transparent pointer-events-none"></div>
           <div className="flex items-center gap-2 mb-6 relative z-10">
-            <div className="w-8 h-8 rounded-lg bg-[#FF6B00]/10 flex items-center justify-center">
-                <Target className="w-4 h-4 text-[#FF6B00]" />
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Target className="w-4 h-4 text-primary" />
             </div>
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">ATS Score Progression</h2>
           </div>
@@ -162,12 +162,12 @@ export default function Scorecard() {
                 <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
                 <YAxis type="number" domain={[0, 100]} stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
                 <RechartsTooltip 
-                  cursor={{fill: 'rgba(255, 107, 0, 0.05)'}}
+                  cursor={{fill: 'rgba(233, 120, 98, 0.05)'}}
                   contentStyle={{ backgroundColor: 'rgba(17, 17, 17, 0.9)', borderColor: 'rgba(255,255,255,0.1)', color: '#fff', borderRadius: '8px' }}
                 />
-                <Bar dataKey="score" name="ATS Score" fill="#FF6B00" radius={[4, 4, 0, 0]} maxBarSize={50}>
+                <Bar dataKey="score" name="ATS Score" fill="#E97862" radius={[4, 4, 0, 0]} maxBarSize={50}>
                   {atsData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.score >= 80 ? '#10B981' : entry.score >= 60 ? '#F59E0B' : '#FF6B00'} />
+                    <Cell key={`cell-${index}`} fill={entry.score >= 80 ? '#22C55E' : entry.score >= 60 ? '#F59E0B' : '#E97862'} />
                   ))}
                 </Bar>
               </BarChart>

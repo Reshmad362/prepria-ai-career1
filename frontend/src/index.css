@@ -9,36 +9,60 @@
     --background: #FAFAFA;
     --card: #FFFFFF;
     --primary: #FF6B00;
+    --primary-dark: #E05D00;
+    --primary-light: #FFF1E8;
     --secondary: #111111;
-    --accent: #FF9A3C;
+    --accent: #FF8533;
     --success: #2ECC71;
     --danger: #E74C3C;
     --text: #111111;
     --text-muted: #666666;
-    --border: #EAEAEA;
+    --border: #E8E8E8;
   }
 
   .dark {
-    --background: #0A0A0A;
-    --card: #141414;
+    --background: #0F172A;
+    --card: #1E293B;
     --primary: #FF6B00;
+    --primary-dark: #E05D00;
+    --primary-light: rgba(255, 107, 0, 0.15);
     --secondary: #FAFAFA;
-    --accent: #FF9A3C;
+    --accent: #FF8533;
     --success: #2ECC71;
-    --danger: #E74C3C;
-    --text: #FAFAFA;
-    --text-muted: #A0A0A0;
-    --border: #2A2A2A; 
+    --danger: #EF4444;
+    --text: #F8FAFC;
+    --text-muted: #94A3B8;
+    --border: #334155; 
   }
 
   body {
-    @apply bg-background text-text transition-colors duration-200 antialiased font-inter;
+    @apply bg-background text-text transition-colors duration-200 antialiased font-manrope;
   }
 }
 
-/* Base custom classes to save writing repetitive tailwind */
+/* Base custom classes & typography standards */
 @layer components {
   .glass-card {
     @apply bg-card border border-border rounded-xl shadow-sm;
+  }
+
+  .profile-name {
+    @apply text-[28px] font-bold font-poppins leading-tight;
+  }
+
+  .profile-headline {
+    @apply text-[17px] font-normal font-poppins;
+  }
+
+  .section-title {
+    @apply text-[21px] font-semibold font-poppins;
+  }
+
+  .tab-item {
+    @apply text-[16px] font-medium font-poppins;
+  }
+
+  .body-text {
+    @apply text-[15px] font-normal font-poppins;
   }
 }

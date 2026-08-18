@@ -9,7 +9,8 @@ import LoadingButton from '../components/LoadingButton';
 import { UserContext } from '../contexts/UserContext';
 import { logActivity } from '../utils/activityLogger';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+
 
 export default function OTPVerification() {
   const navigate = useNavigate();

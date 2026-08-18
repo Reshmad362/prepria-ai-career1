@@ -100,10 +100,10 @@ export default function Dashboard() {
           <p className="text-gray-500 dark:text-gray-400 font-medium mt-1 font-inter">Here is your executive career overview.</p>
         </div>
         <div className="flex gap-3">
-          <Button onClick={() => navigate('/resume-upload')} variant="outline" className="shadow-sm border-[#FF6B00] text-[#FF6B00] hover:bg-[#FF6B00] hover:text-white transition-colors">
+          <Button onClick={() => navigate('/resume-upload')} variant="outline" className="shadow-sm border-primary text-primary hover:bg-primary hover:text-white transition-colors">
             Update Resume
           </Button>
-          <Button onClick={() => navigate('/mock-interview')} className="bg-[#FF6B00] hover:bg-[#E65C00] text-white shadow-md shadow-[#FF6B00]/20 border-0">
+          <Button onClick={() => navigate('/mock-interview')} className="bg-primary hover:bg-primaryHover text-white shadow-md shadow-primary/20 border-0">
             Start Interview
           </Button>
         </div>
@@ -118,15 +118,15 @@ export default function Dashboard() {
 
       {/* Profile Completion Alert in Dashboard */}
       {profileCompletion < 100 && (
-        <Card className="bg-[#FF6B00]/5 border-l-4 border-[#FF6B00] dark:bg-[#FF6B00]/10 mb-6 p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+        <Card className="bg-primary/5 border-l-4 border-primary dark:bg-primary/10 mb-6 p-4 flex flex-col md:flex-row items-center justify-between gap-4">
           <div>
             <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2 font-poppins">
-              <Target className="w-5 h-5 text-[#FF6B00]" /> Complete Your Profile ({profileCompletion}%)
+              <Target className="w-5 h-5 text-primary" /> Complete Your Profile ({profileCompletion}%)
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 font-inter">Unlock tailored opportunities and better AI insights by finishing your profile.</p>
             {missingFields?.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-2 items-center">
-                <span className="text-xs font-semibold text-[#FF6B00]">Missing:</span>
+                <span className="text-xs font-semibold text-primary">Missing:</span>
                 {missingFields.map((f, i) => (
                   <span key={i} className="text-xs px-2 py-1 bg-white dark:bg-[#141414] text-gray-700 dark:text-gray-300 rounded-md shadow-sm border border-gray-200 dark:border-gray-800">
                     {f}
@@ -151,7 +151,7 @@ export default function Dashboard() {
           trend={metrics.weeklyGrowth >= 0 ? "up" : "down"}
           trendValue={`${Math.abs(metrics.weeklyGrowth)}%`}
           subtitle={`Readiness: ${metrics.careerReadiness}`}
-          colorClass="text-[#FF6B00] bg-[#FF6B00]/10" 
+          colorClass="text-primary bg-primary/10" 
         />
         <DashboardStatCard 
           loading={loading}
@@ -207,8 +207,8 @@ export default function Dashboard() {
                         <AreaChart data={metrics.recentHistory} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                             <defs>
                                 <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#FF6B00" stopOpacity={0.3}/>
-                                    <stop offset="95%" stopColor="#FF6B00" stopOpacity={0}/>
+                                    <stop offset="5%" stopColor="#E97862" stopOpacity={0.3}/>
+                                    <stop offset="95%" stopColor="#E97862" stopOpacity={0}/>
                                 </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#333" opacity={0.2} />
@@ -218,7 +218,7 @@ export default function Dashboard() {
                                 contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', backgroundColor: 'var(--card)' }}
                                 itemStyle={{ fontWeight: 600 }}
                             />
-                            <Area type="monotone" dataKey="score" name="Overall Score" stroke="#FF6B00" strokeWidth={3} fillOpacity={1} fill="url(#colorScore)" />
+                            <Area type="monotone" dataKey="score" name="Overall Score" stroke="#E97862" strokeWidth={3} fillOpacity={1} fill="url(#colorScore)" />
                             <Line type="monotone" dataKey="fluency" name="Fluency" stroke="#2ECC71" strokeWidth={2} dot={false} />
                             <Line type="monotone" dataKey="confidence" name="Confidence" stroke="#8B5CF6" strokeWidth={2} dot={false} />
                         </AreaChart>
@@ -237,16 +237,16 @@ export default function Dashboard() {
         {/* AI Recommendations */}
         <Card className="bg-gradient-to-br from-[#111111] to-[#222222] text-white border-0">
             <h2 className="text-lg font-bold mb-6 font-poppins flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-[#FF6B00]" /> AI Recommended Next Steps
+                <Sparkles className="w-5 h-5 text-primary" /> AI Recommended Next Steps
             </h2>
             
             <div className="space-y-4">
                 <div className="bg-white/10 p-4 rounded-xl border border-white/5 backdrop-blur-sm">
-                    <h3 className="font-semibold text-lg text-[#FF9A3C]">Top Priority</h3>
+                    <h3 className="font-semibold text-lg text-accent">Top Priority</h3>
                     <p className="text-gray-300 text-sm mt-1 mb-3">{metrics.recommendedNextStep}</p>
                     <Button 
                         onClick={() => navigate(metrics.recommendedNextStep.includes("Resume") ? '/resume-upload' : '/mock-interview')}
-                        className="w-full bg-[#FF6B00] hover:bg-[#E65C00] text-white border-0"
+                        className="w-full bg-primary hover:bg-primaryHover text-white border-0"
                     >
                         Take Action
                     </Button>

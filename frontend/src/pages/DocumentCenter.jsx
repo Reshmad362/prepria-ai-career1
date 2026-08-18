@@ -142,7 +142,7 @@ export default function DocumentCenter() {
           <Button 
             onClick={() => fileInputRef.current.click()} 
             disabled={uploading}
-            className="bg-[#FF6B00] hover:bg-[#E65C00] text-white shadow-md shadow-[#FF6B00]/20 flex items-center gap-2 border-0"
+            className="bg-primary hover:bg-primaryHover text-white shadow-md shadow-primary/20 flex items-center gap-2 border-0"
           >
             {uploading ? (
               <span className="flex items-center gap-2"><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Uploading...</span>
@@ -159,7 +159,7 @@ export default function DocumentCenter() {
                   <button 
                     key={tab} 
                     onClick={() => setActiveTab(tab)}
-                    className={`whitespace-nowrap px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === tab ? 'bg-[#FF6B00]/10 text-[#FF6B00]' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+                    className={`whitespace-nowrap px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === tab ? 'bg-primary/10 text-primary' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
                   >
                       {tab}
                   </button>
@@ -172,7 +172,7 @@ export default function DocumentCenter() {
                   placeholder="Search documents..." 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#FF6B00]/50"
+                  className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
               />
           </div>
       </div>
@@ -190,7 +190,7 @@ export default function DocumentCenter() {
             </div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2 font-poppins">No documents found</h2>
             <p className="text-gray-500 max-w-sm mx-auto mb-6 font-inter text-sm">You haven't uploaded any {activeTab !== 'All' ? activeTab.toLowerCase() + 's' : 'documents'} yet.</p>
-            <Button onClick={() => fileInputRef.current.click()} variant="outline" className="border-[#FF6B00] text-[#FF6B00] hover:bg-[#FF6B00]/5">
+            <Button onClick={() => fileInputRef.current.click()} variant="outline" className="border-primary text-primary hover:bg-primary/5">
                 Upload your first document
             </Button>
         </Card>

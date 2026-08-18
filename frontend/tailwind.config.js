@@ -11,19 +11,32 @@ export default {
         background: 'var(--background)',
         card: 'var(--card)',
         primary: 'var(--primary)', // #FF6B00
-        primaryHover: '#E65C00',
+        primaryHover: 'var(--primary-dark)', // #E05D00
+        primaryLight: 'var(--primary-light)', // #FFF1E8
         secondary: 'var(--secondary)', // #111111
-        accent: 'var(--accent)', // #FF9A3C
+        accent: 'var(--accent)', // #FF8533
         success: 'var(--success)', // #2ECC71
-        danger: 'var(--danger)', // #E74C3C
+        danger: 'var(--danger)', // #E74C3C / #EF4444
         text: 'var(--text)',
+        textMuted: 'var(--text-muted)', // #666666
         border: 'var(--border)',
+        prepria: {
+          orange: '#FF6B00',
+          darkOrange: '#E05D00',
+          lightOrange: '#FFF1E8',
+          black: '#111111',
+          dark: '#18181B',
+          border: '#E8E8E8',
+          gray: '#666666',
+          subtle: '#FAFAFA',
+          success: '#2ECC71',
+        }
       },
       fontFamily: {
-        poppins: ['Poppins', 'sans-serif'],
-        inter: ['Inter', 'sans-serif'],
         manrope: ['Manrope', 'sans-serif'],
-        sans: ['Inter', 'sans-serif'], // Setting default to Inter
+        inter: ['Inter', 'sans-serif'],
+        poppins: ['Poppins', 'sans-serif'],
+        sans: ['Manrope', 'Inter', 'sans-serif'],
       },
     },
   },

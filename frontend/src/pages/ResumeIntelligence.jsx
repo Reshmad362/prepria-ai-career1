@@ -130,14 +130,14 @@ export default function ResumeIntelligence() {
         {/* Uploader Section */}
         <Card className="flex flex-col items-center justify-center p-8 relative overflow-hidden group">
           <div 
-            className={`w-full max-w-3xl h-64 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center transition-all duration-300 group-hover:bg-[#FF6B00]/5 ${
-              dragActive ? 'border-[#FF6B00] bg-[#FF6B00]/10' : 'border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50'
+            className={`w-full max-w-3xl h-64 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center transition-all duration-300 group-hover:bg-primary/5 ${
+              dragActive ? 'border-primary bg-primary/10' : 'border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50'
             }`}
             onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={handleDrop}
           >
             {file ? (
               <div className="flex flex-col items-center text-center animate-in fade-in zoom-in duration-300">
-                <FileText className="w-12 h-12 text-[#FF6B00] mb-4" />
+                <FileText className="w-12 h-12 text-primary mb-4" />
                 <p className="font-bold text-gray-900 dark:text-white text-lg">{file.name}</p>
                 <p className="text-sm font-medium text-gray-500 mb-6 drop-shadow-sm">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
                 <div className="flex gap-4">
@@ -153,7 +153,7 @@ export default function ResumeIntelligence() {
                 <p className="text-xl font-bold text-gray-900 dark:text-white mb-2">Drag & drop to analyze</p>
                 <p className="text-sm font-medium text-gray-500 mb-6">Supports PDF & DOCX</p>
                 <label htmlFor="file-upload" className="pointer-events-auto">
-                  <Button as="span" className="cursor-pointer bg-[#FF6B00] hover:bg-[#E65C00] text-white border-0 shadow-lg shadow-[#FF6B00]/20">
+                  <Button as="span" className="cursor-pointer bg-primary hover:bg-primaryHover text-white border-0 shadow-lg shadow-primary/20">
                     Browse Files
                   </Button>
                 </label>
@@ -176,7 +176,7 @@ export default function ResumeIntelligence() {
                     <div className="relative">
                         <svg className="w-40 h-40 transform -rotate-90">
                             <circle cx="80" cy="80" r="70" fill="transparent" stroke="rgba(255,255,255,0.1)" strokeWidth="12" />
-                            <circle cx="80" cy="80" r="70" fill="transparent" stroke="#FF6B00" strokeWidth="12" strokeDasharray="439.8" strokeDashoffset={439.8 - (439.8 * latestAts.score) / 100} className="transition-all duration-1000 ease-out" />
+                            <circle cx="80" cy="80" r="70" fill="transparent" stroke="#E97862" strokeWidth="12" strokeDasharray="439.8" strokeDashoffset={439.8 - (439.8 * latestAts.score) / 100} className="transition-all duration-1000 ease-out" />
                         </svg>
                         <div className="absolute inset-0 flex items-center justify-center">
                             <span className="text-5xl font-black">{latestAts.score}</span>
@@ -221,7 +221,7 @@ export default function ResumeIntelligence() {
 
                     {/* Detailed Feedback */}
                     <Card className="md:col-span-2">
-                        <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><FileSearch className="w-5 h-5 text-[#FF6B00]" /> AI Resume Insights</h3>
+                        <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><FileSearch className="w-5 h-5 text-primary" /> AI Resume Insights</h3>
                         <div className="grid md:grid-cols-2 gap-6">
                             <div>
                                 <h4 className="font-bold text-green-600 flex items-center gap-2 mb-3"><CheckCircle2 className="w-4 h-4" /> Strengths</h4>

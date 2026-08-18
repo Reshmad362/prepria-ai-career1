@@ -52,7 +52,7 @@ export default function CareerRoadmap() {
     const getStatusIcon = (status) => {
         switch(status) {
             case 'completed': return <CheckCircle2 className="w-8 h-8 text-green-500 fill-green-100 dark:fill-green-900/30" />;
-            case 'in_progress': return <PlayCircle className="w-8 h-8 text-[#FF6B00] fill-[#FF6B00]/10" />;
+            case 'in_progress': return <PlayCircle className="w-8 h-8 text-primary fill-primary/10" />;
             case 'locked': return <Lock className="w-8 h-8 text-gray-400 fill-gray-100 dark:fill-gray-800" />;
             default: return <Circle className="w-8 h-8 text-gray-400" />;
         }
@@ -95,11 +95,11 @@ export default function CareerRoadmap() {
                     <p className="text-gray-300 font-inter text-lg">{roadmap.description}</p>
                     <div className="flex items-center gap-4 mt-6">
                         <div className="px-4 py-2 bg-white/10 backdrop-blur-sm rounded-lg border border-white/10 flex items-center gap-2">
-                            <Briefcase className="w-4 h-4 text-[#FF6B00]" />
+                            <Briefcase className="w-4 h-4 text-primary" />
                             <span className="font-semibold">{preferences?.experienceLevel || 'Fresher'}</span>
                         </div>
                         <div className="px-4 py-2 bg-white/10 backdrop-blur-sm rounded-lg border border-white/10 flex items-center gap-2">
-                            <Target className="w-4 h-4 text-[#FF6B00]" />
+                            <Target className="w-4 h-4 text-primary" />
                             <span className="font-semibold">{preferences?.targetRole || 'Not Set'}</span>
                         </div>
                     </div>
@@ -109,7 +109,7 @@ export default function CareerRoadmap() {
             {/* Timeline Map */}
             <div className="relative pl-4 md:pl-0">
                 {/* Vertical Line */}
-                <div className="absolute left-8 md:left-1/2 top-4 bottom-4 w-1 bg-gradient-to-b from-green-500 via-[#FF6B00] to-gray-200 dark:to-gray-800 transform md:-translate-x-1/2 rounded-full"></div>
+                <div className="absolute left-8 md:left-1/2 top-4 bottom-4 w-1 bg-gradient-to-b from-green-500 via-primary to-gray-200 dark:to-gray-800 transform md:-translate-x-1/2 rounded-full"></div>
 
                 <div className="space-y-12 relative z-10">
                     {roadmap.nodes.map((node, index) => {
@@ -127,8 +127,8 @@ export default function CareerRoadmap() {
                                 
                                 {/* Content Card */}
                                 <div className={`w-full md:w-[45%] pl-16 md:pl-0 ${isEven ? 'md:pr-16 md:text-right' : 'md:pl-16 text-left'}`}>
-                                    <Card className={`transition-all duration-300 hover:shadow-xl ${isInProgress ? 'border-[#FF6B00] shadow-lg shadow-[#FF6B00]/5' : isCompleted ? 'border-green-500/50' : 'border-gray-200 dark:border-gray-800 opacity-75'}`}>
-                                        <div className={`text-xs font-bold uppercase tracking-wider mb-2 ${isInProgress ? 'text-[#FF6B00]' : isCompleted ? 'text-green-500' : 'text-gray-400'}`}>
+                                    <Card className={`transition-all duration-300 hover:shadow-xl ${isInProgress ? 'border-primary shadow-lg shadow-primary/5' : isCompleted ? 'border-green-500/50' : 'border-gray-200 dark:border-gray-800 opacity-75'}`}>
+                                        <div className={`text-xs font-bold uppercase tracking-wider mb-2 ${isInProgress ? 'text-primary' : isCompleted ? 'text-green-500' : 'text-gray-400'}`}>
                                             Step {index + 1}
                                         </div>
                                         <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{node.title}</h3>
@@ -136,15 +136,15 @@ export default function CareerRoadmap() {
                                         
                                         <div className={`flex flex-wrap gap-2 mb-4 ${isEven ? 'md:justify-end' : 'justify-start'}`}>
                                             {node.skills.map((skill, i) => (
-                                                <Badge key={i} className={isCompleted ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : isInProgress ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}>
+                                                <Badge key={i} className={isCompleted ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : isInProgress ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}>
                                                     {skill}
                                                 </Badge>
                                             ))}
                                         </div>
 
-                                        <div className={`mt-4 p-3 rounded-lg text-sm font-semibold flex items-center justify-between ${isInProgress ? 'bg-[#FF6B00]/10 text-[#FF6B00]' : 'bg-gray-50 dark:bg-gray-900 text-gray-500'}`}>
+                                        <div className={`mt-4 p-3 rounded-lg text-sm font-semibold flex items-center justify-between ${isInProgress ? 'bg-primary/10 text-primary' : 'bg-gray-50 dark:bg-gray-900 text-gray-500'}`}>
                                             <span className="flex items-center gap-2"><ArrowRight className="w-4 h-4"/> Action Required</span>
-                                            {isInProgress && <Button size="sm" variant="outline" className="border-[#FF6B00] text-[#FF6B00] hover:bg-[#FF6B00] hover:text-white py-1 h-auto text-xs">Start</Button>}
+                                            {isInProgress && <Button size="sm" variant="outline" className="border-primary text-primary hover:bg-primary hover:text-white py-1 h-auto text-xs">Start</Button>}
                                         </div>
                                         <p className="text-xs mt-2 text-gray-500">{node.action}</p>
                                     </Card>

@@ -100,7 +100,7 @@ export default function Profile() {
   const getProgressColor = (val) => {
     if (val < 50) return "bg-yellow-500";
     if (val <= 80) return "bg-blue-500";
-    return "bg-[#FF6B00]";
+    return "bg-primary";
   };
 
   const tabs = ['Overview', 'Resume Intelligence', 'Scorecard', 'Settings'];
@@ -112,10 +112,10 @@ export default function Profile() {
       <div className="flex flex-col gap-4">
         <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white font-poppins">My Profile</h1>
-              <p className="text-gray-500 mt-1 font-inter">Manage your identity and career preferences.</p>
+              <h1 className="section-title text-3xl font-bold text-gray-900 dark:text-white">My Profile</h1>
+              <p className="profile-headline mt-1">Here, you can view & edit your profile</p>
             </div>
-            <Button onClick={() => navigate('/document-center')} variant="outline" className="flex items-center gap-2 border-[#FF6B00] text-[#FF6B00] hover:bg-[#FF6B00]/5">
+            <Button onClick={() => navigate('/document-center')} variant="outline" className="flex items-center gap-2 border-primary text-primary hover:bg-primary/5">
                 <Files className="w-4 h-4" /> Go to Document Center
             </Button>
         </div>
@@ -125,7 +125,7 @@ export default function Profile() {
               <button 
                 key={tab} 
                 onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${activeTab === tab ? 'border-[#FF6B00] text-[#FF6B00]' : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-gray-300'}`}
+                className={`tab-item px-4 py-2 whitespace-nowrap border-b-2 transition-colors ${activeTab === tab ? 'border-primary text-primary font-semibold' : 'border-transparent text-gray-500 hover:text-gray-900 dark:hover:text-gray-300'}`}
               >
                   {tab}
               </button>
@@ -144,34 +144,34 @@ export default function Profile() {
                     <div className="w-24 h-24 rounded-full bg-white/10 border-4 border-white/20 flex items-center justify-center text-4xl font-black mb-4">
                         {profile?.name ? profile.name.charAt(0) : "U"}
                     </div>
-                    <h2 className="text-2xl font-bold font-poppins">{profile?.name || 'Unknown User'}</h2>
-                    <p className="text-gray-400 font-medium">{preferences?.targetRole || 'Role Not Set'}</p>
+                    <h2 className="profile-name text-white">{profile?.name || 'Unknown User'}</h2>
+                    <p className="profile-headline text-gray-300 mt-1">{preferences?.targetRole || 'Role Not Set'}</p>
                     
                     <div className="w-full mt-6 space-y-3 text-left">
-                        <div className="flex items-center gap-3 text-sm text-gray-300">
-                            <Mail className="w-4 h-4 text-[#FF6B00]" /> {profile?.email || 'No email'}
+                        <div className="flex items-center gap-3 body-text text-gray-300">
+                            <Mail className="w-4 h-4 text-primary" /> {profile?.email || 'No email'}
                         </div>
-                        <div className="flex items-center gap-3 text-sm text-gray-300">
-                            <Smartphone className="w-4 h-4 text-[#FF6B00]" /> {profile?.phone || 'No phone'}
+                        <div className="flex items-center gap-3 body-text text-gray-300">
+                            <Smartphone className="w-4 h-4 text-primary" /> {profile?.phone || 'No phone'}
                         </div>
-                        <div className="flex items-center gap-3 text-sm text-gray-300">
-                            <MapPin className="w-4 h-4 text-[#FF6B00]" /> {profile?.city ? `${profile.city}, ${profile.state}` : 'Location Not Set'}
+                        <div className="flex items-center gap-3 body-text text-gray-300">
+                            <MapPin className="w-4 h-4 text-primary" /> {profile?.city ? `${profile.city}, ${profile.state}` : 'Location Not Set'}
                         </div>
                     </div>
                     
-                    <Button onClick={() => setActiveTab('Settings')} className="w-full mt-6 bg-[#FF6B00] hover:bg-[#E65C00] text-white border-0">
+                    <Button onClick={() => setActiveTab('Settings')} className="w-full mt-6 bg-primary hover:bg-primaryHover text-white border-0">
                         Edit Profile
                     </Button>
                 </div>
             </Card>
             
             <div className="lg:col-span-2 space-y-6">
-                <Card className="border-l-4 border-[#FF6B00]">
+                <Card className="border-l-4 border-primary">
                     <div className="flex items-center justify-between mb-3">
-                        <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                            <Target className="w-5 h-5 text-[#FF6B00]" /> Profile Strength
+                        <h3 className="section-title text-gray-900 dark:text-white flex items-center gap-2">
+                            <Target className="w-5 h-5 text-primary" /> Profile Strength
                         </h3>
-                        <span className="font-bold text-[#FF6B00]">{profileCompletion}%</span>
+                        <span className="section-title text-primary">{profileCompletion}% Profile Completed</span>
                     </div>
                     <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2 mb-3 overflow-hidden">
                         <div className={`h-full transition-all duration-1000 ${getProgressColor(profileCompletion)}`} style={{ width: `${profileCompletion}%` }}></div>
@@ -227,7 +227,7 @@ export default function Profile() {
                     <div className="lg:col-span-1 space-y-6">
                         <Card className="text-center">
                             <h3 className="font-bold text-gray-500 uppercase text-xs tracking-wider mb-2">Current ATS Score</h3>
-                            <div className="text-5xl font-black text-[#FF6B00] mb-2">{profile.score || 0}</div>
+                            <div className="text-5xl font-black text-primary mb-2">{profile.score || 0}</div>
                             <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Based on latest analysis</p>
                             <Button onClick={() => navigate('/resume-upload')} variant="outline" className="w-full mt-6">Scan New Resume</Button>
                         </Card>
@@ -275,7 +275,7 @@ export default function Profile() {
                     <div className="text-sm font-bold text-gray-500 uppercase tracking-wider mt-1">Avg Score</div>
                 </Card>
                 <Card className="text-center py-8">
-                    <Activity className="w-8 h-8 text-[#FF6B00] mx-auto mb-3" />
+                    <Activity className="w-8 h-8 text-primary mx-auto mb-3" />
                     <div className="text-3xl font-black text-gray-900 dark:text-white">{uploadActs.length}</div>
                     <div className="text-sm font-bold text-gray-500 uppercase tracking-wider mt-1">Resume Scans</div>
                 </Card>
@@ -291,7 +291,7 @@ export default function Profile() {
                                     <h4 className="font-bold text-gray-900 dark:text-white">{act.title}</h4>
                                     <p className="text-xs text-gray-500 mt-1">{new Date(act.timestamp).toLocaleString()}</p>
                                 </div>
-                                <div className="text-xl font-black text-[#FF6B00]">{act.metadata?.score || '--'}</div>
+                                <div className="text-xl font-black text-primary">{act.metadata?.score || '--'}</div>
                             </div>
                         ))}
                     </div>
