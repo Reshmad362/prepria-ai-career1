@@ -3,16 +3,22 @@ import { UserContext } from '../contexts/UserContext';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import DashboardStatCard from '../components/DashboardStatCard';
-import { Target, FileSearch, CheckCircle, TrendingUp, Sparkles, MessageSquare, Briefcase, Award, Zap, BrainCircuit, Activity, Clock, FileUp, LogIn } from 'lucide-react';
+import StartInterviewModal from '../components/StartInterviewModal';
+import { 
+  Target, FileSearch, CheckCircle, CheckCircle2, FileCheck, TrendingUp, 
+  Sparkles, MessageSquare, Briefcase, Award, Zap, BrainCircuit, Activity, 
+  Clock, FileUp, LogIn, ArrowRight, Flame, BookOpen, Layers, Check 
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatTime } from '../utils/activityLogger';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { profile, profileCompletion, missingFields } = useContext(UserContext);
+  const { profile, profileCompletion, missingFields, completionData } = useContext(UserContext);
   const [userName, setUserName] = useState('User');
   const [activities, setActivities] = useState([]);
+  const [isInterviewModalOpen, setIsInterviewModalOpen] = useState(false);
   
   // Dashboard Metrics State
   const [loading, setLoading] = useState(true);
@@ -27,10 +33,16 @@ export default function Dashboard() {
     confidenceScore: 0,
     currentStreak: 0,
     learningHours: 0,
-    interviewScore: 0,
-    profileCompletion: 0,
+    learningTimeFormatted: '0m',
+    lessonsCompleted: 0,
+    assessmentsPassed: 0,
     coursesCompleted: 0,
     certificatesEarned: 0,
+    skillsDemonstrated: [],
+    skillsDemonstratedCount: 0,
+    weeklyActivity: [],
+    interviewScore: 0,
+    profileCompletion: 0,
     targetCompany: 'Not Set',
     targetRole: 'Not Set',
     recommendedNextStep: 'Upload Resume',
@@ -40,6 +52,7 @@ export default function Dashboard() {
     monthlyGrowth: 0,
     interviewReadiness: '0%',
     recentHistory: [],
+    recentActivities: [],
     trend: 'No Data'
   });
 
@@ -62,21 +75,26 @@ export default function Dashboard() {
     const fetchAnalytics = async () => {
       try {
         setLoading(true);
-        const email = profile?.email || localStorage.getItem('userEmail');
-        if (!email) {
-            setLoading(false);
-            return;
+        const authenticatedUserId =
+          profile?.email ||
+          localStorage.getItem('activeUser'); // set by UserContext during login
+
+        if (!authenticatedUserId) {
+          throw new Error('Failed to load dashboard data: user not authenticated');
         }
 
-        const response = await fetch(`http://localhost:8000/analytics/dashboard/${email}`);
-        if (!response.ok) {
-            throw new Error('Failed to fetch analytics');
-        }
+        const token = localStorage.getItem('token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+        const response = await fetch(
+          `http://localhost:8000/analytics/dashboard/${encodeURIComponent(authenticatedUserId)}`,
+          { headers }
+        );
+        if (!response.ok) throw new Error('Failed to fetch analytics');
         
         const result = await response.json();
-        if (result.success && result.data) {
-            setMetrics(result.data);
-        }
+        if (result?.success && result?.data) setMetrics((prev) => ({ ...prev, ...result.data }));
+        else throw new Error('Failed to fetch analytics');
       } catch (err) {
         console.error("Dashboard fetch error:", err);
         setError("Failed to load dashboard data. Please try again later.");
@@ -85,60 +103,117 @@ export default function Dashboard() {
       }
     };
     
-    if (profile?.email || localStorage.getItem('userEmail')) {
-        fetchAnalytics();
-    }
+    fetchAnalytics();
+    window.addEventListener('activityLogged', fetchAnalytics);
 
-    return () => window.removeEventListener('activityLogged', fetchActivities);
+    return () => {
+      window.removeEventListener('activityLogged', fetchActivities);
+      window.removeEventListener('activityLogged', fetchAnalytics);
+    };
   }, [profile]);
 
+  // Combine backend recentActivities with local activities fallback
+  const displayActivities = (metrics.recentActivities && metrics.recentActivities.length > 0)
+    ? metrics.recentActivities
+    : activities.slice(0, 5);
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500 font-manrope">
+      
+      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white font-poppins">Welcome back, {userName}! 👋</h1>
-          <p className="text-gray-500 dark:text-gray-400 font-medium mt-1 font-inter">Here is your executive career overview.</p>
+          <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">Welcome back, {userName}! 👋</h1>
+          <p className="text-gray-500 dark:text-gray-400 font-medium mt-1 text-sm">Here is your executive career intelligence overview.</p>
         </div>
-        <div className="flex gap-3">
-          <Button onClick={() => navigate('/resume-upload')} variant="outline" className="shadow-sm border-primary text-primary hover:bg-primary hover:text-white transition-colors">
+        <div className="flex items-center gap-3 flex-wrap">
+          <button 
+            onClick={() => navigate('/resume-upload')} 
+            className="px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 text-xs sm:text-sm font-bold shadow-2xs transition-all cursor-pointer"
+          >
             Update Resume
-          </Button>
-          <Button onClick={() => navigate('/mock-interview')} className="bg-primary hover:bg-primaryHover text-white shadow-md shadow-primary/20 border-0">
-            Start Interview
-          </Button>
+          </button>
+          <button 
+            onClick={() => setIsInterviewModalOpen(true)} 
+            className="px-5 py-2.5 rounded-xl bg-primary hover:bg-primaryHover text-white text-xs sm:text-sm font-bold shadow-md shadow-primary/25 hover:shadow-lg flex items-center gap-2 transition-all cursor-pointer"
+          >
+            <span>Start AI Interview</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
       {error && (
-          <div className="p-4 bg-red-50 text-red-600 border border-red-200 rounded-xl flex items-center justify-between">
-              <span>{error}</span>
-              <button onClick={() => window.location.reload()} className="text-sm underline font-medium">Retry</button>
-          </div>
+        <div className="p-4 bg-red-50 text-red-600 border border-red-200 rounded-xl flex items-center justify-between text-xs">
+          <span>{error}</span>
+          <button onClick={() => window.location.reload()} className="underline font-bold">Retry</button>
+        </div>
       )}
 
       {/* Profile Completion Alert in Dashboard */}
       {profileCompletion < 100 && (
-        <Card className="bg-primary/5 border-l-4 border-primary dark:bg-primary/10 mb-6 p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div>
-            <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2 font-poppins">
-              <Target className="w-5 h-5 text-primary" /> Complete Your Profile ({profileCompletion}%)
+        <div className="bg-white dark:bg-[#111215] border border-orange-200 dark:border-orange-900/30 rounded-3xl p-5 sm:p-6 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-5 relative overflow-hidden">
+          <div className="space-y-2 max-w-2xl">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                <Target className="w-4 h-4 text-primary" /> Profile Completion
+              </span>
+              <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-orange-50 dark:bg-orange-950/40 text-primary border border-orange-200 dark:border-orange-900/30">
+                {profileCompletion}% Complete
+              </span>
+            </div>
+
+            <h3 className="text-base font-extrabold text-gray-900 dark:text-white">
+              Complete your profile to unlock tailored AI mock interviews and career readiness insights.
             </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 font-inter">Unlock tailored opportunities and better AI insights by finishing your profile.</p>
-            {missingFields?.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2 items-center">
-                <span className="text-xs font-semibold text-primary">Missing:</span>
-                {missingFields.map((f, i) => (
-                  <span key={i} className="text-xs px-2 py-1 bg-white dark:bg-[#141414] text-gray-700 dark:text-gray-300 rounded-md shadow-sm border border-gray-200 dark:border-gray-800">
-                    {f}
-                  </span>
-                ))}
-              </div>
-            )}
+
+            {/* Missing Fields & Resume Status Pills */}
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              {missingFields?.length > 0 && (
+                <>
+                  <span className="text-xs font-bold text-gray-400">Missing:</span>
+                  {missingFields.map((field, i) => (
+                    <span 
+                      key={i} 
+                      className="text-xs font-semibold px-2.5 py-0.5 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 rounded-lg border border-red-200 dark:border-red-900/30"
+                    >
+                      {field}
+                    </span>
+                  ))}
+                </>
+              )}
+
+              {completionData?.resumeStatus?.isAnalyzed ? (
+                <div className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-0.5 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 rounded-lg border border-emerald-200 dark:border-emerald-800/40">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Resume Analyzed</span>
+                  <span className="font-bold">• ATS: {completionData.resumeStatus.score || 0}</span>
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-0.5 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 rounded-lg border border-amber-200 dark:border-amber-800/40">
+                  <FileSearch className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Resume not uploaded</span>
+                </div>
+              )}
+            </div>
           </div>
-          <Button onClick={() => navigate('/profile')} className="whitespace-nowrap shrink-0 bg-[#111111] text-white hover:bg-gray-800">
-            Complete Now
-          </Button>
-        </Card>
+
+          <div className="flex items-center gap-2.5 self-end md:self-center shrink-0">
+            <button 
+              onClick={() => navigate('/resume-upload')}
+              className="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+            >
+              {completionData?.resumeStatus?.isAnalyzed ? 'View Resume Analysis' : 'Upload Resume'}
+            </button>
+            <button 
+              onClick={() => navigate('/profile')} 
+              className="px-4 py-2 rounded-xl bg-primary hover:bg-primaryHover text-white text-xs font-bold shadow-sm inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <span>Complete Profile</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Executive KPI Grid */}
@@ -190,144 +265,262 @@ export default function Dashboard() {
         
         {/* Performance Trend Chart */}
         <Card className="lg:col-span-2">
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white font-poppins">Longitudinal Performance</h2>
-                <div className="text-sm font-medium px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-600 dark:text-gray-300">
-                    Trend: <span className={metrics.trend === 'Increasing' ? 'text-green-500' : metrics.trend === 'Decreasing' ? 'text-red-500' : ''}>{metrics.trend}</span>
-                </div>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-base font-extrabold text-gray-900 dark:text-white">Longitudinal Performance</h2>
+            <div className="text-xs font-bold px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-600 dark:text-gray-300">
+              Trend: <span className={metrics.trend === 'Increasing' ? 'text-green-500' : metrics.trend === 'Decreasing' ? 'text-red-500' : ''}>{metrics.trend}</span>
             </div>
-            
-            {loading ? (
-                <div className="h-[300px] flex items-center justify-center animate-pulse bg-gray-50 dark:bg-gray-900 rounded-xl">
-                     <span className="text-gray-400 font-medium">Loading Chart Data...</span>
-                </div>
-            ) : metrics.recentHistory.length > 0 ? (
-                <div className="h-[300px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={metrics.recentHistory} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                            <defs>
-                                <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#E97862" stopOpacity={0.3}/>
-                                    <stop offset="95%" stopColor="#E97862" stopOpacity={0}/>
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#333" opacity={0.2} />
-                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#888', fontSize: 12}} dy={10} />
-                            <YAxis axisLine={false} tickLine={false} tick={{fill: '#888', fontSize: 12}} />
-                            <Tooltip 
-                                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', backgroundColor: 'var(--card)' }}
-                                itemStyle={{ fontWeight: 600 }}
-                            />
-                            <Area type="monotone" dataKey="score" name="Overall Score" stroke="#E97862" strokeWidth={3} fillOpacity={1} fill="url(#colorScore)" />
-                            <Line type="monotone" dataKey="fluency" name="Fluency" stroke="#2ECC71" strokeWidth={2} dot={false} />
-                            <Line type="monotone" dataKey="confidence" name="Confidence" stroke="#8B5CF6" strokeWidth={2} dot={false} />
-                        </AreaChart>
-                    </ResponsiveContainer>
-                </div>
-            ) : (
-                <div className="h-[300px] flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-xl">
-                    <TrendingUp className="w-12 h-12 text-gray-300 mb-3" />
-                    <h3 className="text-lg font-bold text-gray-700 dark:text-gray-300">No Analytics Yet</h3>
-                    <p className="text-gray-500 max-w-sm mt-1 mb-4">Complete a mock interview or resume analysis to generate your longitudinal growth charts.</p>
-                    <Button onClick={() => navigate('/mock-interview')} className="bg-[#111111] text-white hover:bg-gray-800">Generate Data</Button>
-                </div>
-            )}
+          </div>
+          
+          {loading ? (
+            <div className="h-[300px] flex items-center justify-center animate-pulse bg-gray-50 dark:bg-gray-900 rounded-xl">
+              <span className="text-gray-400 font-bold text-xs">Loading Chart Data...</span>
+            </div>
+          ) : metrics.recentHistory.length > 0 ? (
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={metrics.recentHistory} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#FF6B00" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#FF6B00" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#333" opacity={0.2} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#888', fontSize: 12}} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#888', fontSize: 12}} />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', backgroundColor: 'var(--card)' }}
+                    itemStyle={{ fontWeight: 600 }}
+                  />
+                  <Area type="monotone" dataKey="score" name="Overall Score" stroke="#FF6B00" strokeWidth={3} fillOpacity={1} fill="url(#colorScore)" />
+                  <Line type="monotone" dataKey="fluency" name="Fluency" stroke="#2ECC71" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="confidence" name="Confidence" stroke="#8B5CF6" strokeWidth={2} dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-[300px] flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-xl">
+              <TrendingUp className="w-10 h-10 text-gray-300 mb-3" />
+              <h3 className="text-sm font-extrabold text-gray-700 dark:text-gray-300">No Longitudinal Analytics Yet</h3>
+              <p className="text-xs text-gray-500 max-w-sm mt-1 mb-4">Complete an AI mock interview or curriculum lesson to generate longitudinal performance trends.</p>
+              <Button onClick={() => navigate('/mock-interview')} className="bg-primary hover:bg-primaryHover text-white">Start First Interview</Button>
+            </div>
+          )}
         </Card>
 
         {/* AI Recommendations */}
-        <Card className="bg-gradient-to-br from-[#111111] to-[#222222] text-white border-0">
-            <h2 className="text-lg font-bold mb-6 font-poppins flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-primary" /> AI Recommended Next Steps
-            </h2>
-            
-            <div className="space-y-4">
-                <div className="bg-white/10 p-4 rounded-xl border border-white/5 backdrop-blur-sm">
-                    <h3 className="font-semibold text-lg text-accent">Top Priority</h3>
-                    <p className="text-gray-300 text-sm mt-1 mb-3">{metrics.recommendedNextStep}</p>
-                    <Button 
-                        onClick={() => navigate(metrics.recommendedNextStep.includes("Resume") ? '/resume-upload' : '/mock-interview')}
-                        className="w-full bg-primary hover:bg-primaryHover text-white border-0"
-                    >
-                        Take Action
-                    </Button>
-                </div>
-                
-                <div className="bg-white/5 p-4 rounded-xl border border-white/5">
-                    <h3 className="font-medium text-sm text-gray-400 mb-2">Secondary Goals</h3>
-                    <ul className="space-y-3">
-                        <li className="flex items-start gap-3">
-                            <div className="w-6 h-6 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0 mt-0.5"><Briefcase className="w-3 h-3" /></div>
-                            <span className="text-sm text-gray-300">Review new Job Recommendations matching {metrics.targetRole}</span>
-                        </li>
-                        <li className="flex items-start gap-3">
-                            <div className="w-6 h-6 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center shrink-0 mt-0.5"><Award className="w-3 h-3" /></div>
-                            <span className="text-sm text-gray-300">Complete missing profile achievements ({metrics.profileCompletion}%)</span>
-                        </li>
-                    </ul>
-                </div>
+        <Card className="bg-gradient-to-br from-[#111111] to-[#1E2028] text-white border-0">
+          <h2 className="text-base font-extrabold mb-5 flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-primary" /> AI Career Recommendation
+          </h2>
+          
+          <div className="space-y-4">
+            <div className="bg-white/10 p-4 rounded-2xl border border-white/5 backdrop-blur-sm">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-primary block">Top Priority</span>
+              <p className="text-gray-200 text-xs mt-1 mb-3 font-semibold leading-relaxed">{metrics.recommendedNextStep}</p>
+              <Button 
+                onClick={() => navigate(metrics.recommendedNextStep.includes("Resume") ? '/resume-upload' : '/my-courses')}
+                className="w-full bg-primary hover:bg-primaryHover text-white border-0 text-xs font-bold"
+              >
+                Take Action
+              </Button>
             </div>
-        </Card>
-      </div>
-
-      {/* Meta Stats & Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-1">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 font-poppins">Engagement</h2>
-              <div className="space-y-4">
-                  <div className="flex justify-between items-center p-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                          <div className="p-2 bg-orange-100 text-orange-600 dark:bg-orange-900/30 rounded-lg"><Zap className="w-4 h-4" /></div>
-                          <span className="font-medium">Current Streak</span>
-                      </div>
-                      <span className="font-bold">{metrics.currentStreak} Days</span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                          <div className="p-2 bg-blue-100 text-blue-600 dark:bg-blue-900/30 rounded-lg"><Clock className="w-4 h-4" /></div>
-                          <span className="font-medium">Learning Hours</span>
-                      </div>
-                      <span className="font-bold">{metrics.learningHours} Hrs</span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                          <div className="p-2 bg-purple-100 text-purple-600 dark:bg-purple-900/30 rounded-lg"><Award className="w-4 h-4" /></div>
-                          <span className="font-medium">Certificates</span>
-                      </div>
-                      <span className="font-bold">{metrics.certificatesEarned}</span>
-                  </div>
-              </div>
-          </Card>
-
-          <Card className="lg:col-span-2">
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 font-poppins">Recent Activity</h2>
-          <div className="space-y-3">
-            {activities.length === 0 ? (
-              <p className="text-sm border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-lg p-8 font-medium text-gray-500 text-center">No activity yet. Start by uploading your resume.</p>
-            ) : activities.slice(0, 4).map((activity) => (
-              <div key={activity.id} className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-3 hover:bg-gray-50 dark:hover:bg-[#141414] rounded-xl transition-colors border border-transparent hover:border-gray-100 dark:hover:border-gray-800">
-                <div className={`p-2.5 rounded-xl flex-shrink-0 ${activity.status === 'success' ? 'bg-[#2ECC71]/10 text-[#2ECC71]' : activity.status === 'warning' ? 'bg-[#FF9A3C]/10 text-[#FF9A3C]' : 'bg-blue-500/10 text-blue-500'}`}>
-                  {activity.type === 'resume_upload' ? <FileUp className="w-5 h-5" /> :
-                   activity.type === 'ats_analysis' ? <FileSearch className="w-5 h-5" /> :
-                   activity.type === 'interview_complete' ? <CheckCircle className="w-5 h-5" /> :
-                   activity.type === 'role_suggestion' ? <Target className="w-5 h-5" /> :
-                   activity.type === 'login' ? <LogIn className="w-5 h-5" /> :
-                   <Activity className="w-5 h-5" />}
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{activity.title}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{activity.description}</p>
-                  <p className="text-[10px] text-gray-400 mt-1 font-medium tracking-wide">{formatTime(activity.timestamp)}</p>
-                </div>
-                {activity.metadata?.score && (
-                  <div className={`ml-auto flex-shrink-0 mt-2 sm:mt-0 px-3 py-1 rounded-full text-xs font-bold ${activity.status === 'warning' ? 'bg-[#FF9A3C]/10 text-[#FF9A3C]' : 'bg-[#2ECC71]/10 text-[#2ECC71]'}`}>
-                    Score: {activity.metadata.score}
-                  </div>
-                )}
-              </div>
-            ))}
+            
+            <div className="bg-white/5 p-4 rounded-2xl border border-white/5 space-y-2">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400 block">Secondary Goals</span>
+              <ul className="space-y-2 text-xs">
+                <li className="flex items-start gap-2.5">
+                  <div className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0 mt-0.5"><Briefcase className="w-3 h-3" /></div>
+                  <span className="text-gray-300">Review jobs matching {metrics.targetRole}</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5"><Award className="w-3 h-3" /></div>
+                  <span className="text-gray-300">Earn {metrics.targetRole} course certificate</span>
+                </li>
+              </ul>
+            </div>
           </div>
         </Card>
       </div>
+
+      {/* ==================================================
+          CENTRALIZED LEARNING MOMENTUM & RECENT ACTIVITY
+      ================================================== */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Card 1 & 2: Learning Momentum (2 Cols) */}
+        <Card className="lg:col-span-2 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 dark:border-gray-800 pb-4">
+            <div>
+              <div className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wider text-primary">
+                <Flame className="w-4 h-4 fill-primary" />
+                <span>Learning Momentum</span>
+              </div>
+              <h3 className="text-base font-extrabold text-gray-900 dark:text-white mt-0.5">
+                Weekly Engagement &amp; Skill Progression
+              </h3>
+            </div>
+
+            <button 
+              onClick={() => navigate('/my-courses')}
+              className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline cursor-pointer self-start sm:self-auto"
+            >
+              <span>Explore Learning Hub</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Primary Momentum Metric Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5">
+            <div className="p-4 rounded-2xl bg-orange-50/60 dark:bg-orange-950/20 border border-orange-200/60 dark:border-orange-900/30">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-primary block">Current Streak</span>
+              <span className="text-lg font-extrabold text-gray-900 dark:text-white mt-1 block">
+                {metrics.currentStreak} Days 🔥
+              </span>
+              <span className="text-[10px] text-gray-500 block mt-0.5">Consecutive active days</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-900/30">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-600 dark:text-blue-400 block">Learning Time</span>
+              <span className="text-lg font-extrabold text-gray-900 dark:text-white mt-1 block">
+                {metrics.learningTimeFormatted || `${metrics.learningHours}h`}
+              </span>
+              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold block mt-0.5">
+                {metrics.weeklyGrowth > 0 ? `↑ ${metrics.weeklyGrowth}% this week` : 'Active tracking'}
+              </span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-purple-50/60 dark:bg-purple-950/20 border border-purple-200/60 dark:border-purple-900/30">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-600 dark:text-purple-400 block">Lessons Completed</span>
+              <span className="text-lg font-extrabold text-gray-900 dark:text-white mt-1 block">
+                {metrics.lessonsCompleted} Lessons
+              </span>
+              <span className="text-[10px] text-gray-500 block mt-0.5">Across guided courses</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-900/30">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block">Assessments</span>
+              <span className="text-lg font-extrabold text-gray-900 dark:text-white mt-1 block">
+                {metrics.assessmentsPassed} Passed
+              </span>
+              <span className="text-[10px] text-gray-500 block mt-0.5">Checkpoint quizzes</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/30">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-600 dark:text-amber-400 block">Certificates</span>
+              <span className="text-lg font-extrabold text-gray-900 dark:text-white mt-1 block">
+                {metrics.certificatesEarned} Earned
+              </span>
+              <span className="text-[10px] text-gray-500 block mt-0.5">300 DPI Verifiable</span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200/60 dark:border-rose-900/30">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-600 dark:text-rose-400 block">Skills Demonstrated</span>
+              <span className="text-lg font-extrabold text-gray-900 dark:text-white mt-1 block">
+                {metrics.skillsDemonstratedCount || metrics.skillsDemonstrated?.length || 0} Skills
+              </span>
+              <span className="text-[10px] text-gray-500 block mt-0.5">Via practical tasks</span>
+            </div>
+          </div>
+
+          {/* Weekly Heatmap Activity Row */}
+          <div className="p-4 rounded-2xl bg-gray-50/80 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800 space-y-3">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-extrabold uppercase tracking-wider text-gray-400 text-[10px]">
+                This Week Activity Heatmap
+              </span>
+              <span className="text-gray-500 font-bold">
+                {metrics.learningTimeFormatted || '0m'} active
+              </span>
+            </div>
+
+            <div className="grid grid-cols-7 gap-2 text-center">
+              {(metrics.weeklyActivity && metrics.weeklyActivity.length === 7 
+                ? metrics.weeklyActivity 
+                : [
+                    { dayName: 'Mon', active: false, minutes: 0 },
+                    { dayName: 'Tue', active: false, minutes: 0 },
+                    { dayName: 'Wed', active: false, minutes: 0 },
+                    { dayName: 'Thu', active: false, minutes: 0 },
+                    { dayName: 'Fri', active: false, minutes: 0 },
+                    { dayName: 'Sat', active: false, minutes: 0 },
+                    { dayName: 'Sun', active: false, minutes: 0 }
+                  ]
+              ).map((day, idx) => (
+                <div key={idx} className="flex flex-col items-center gap-1.5">
+                  <span className="text-[10px] font-bold text-gray-400">{day.dayName}</span>
+                  <div 
+                    title={`${day.dayName}: ${day.minutes || 0} mins (${day.lessons || 0} lessons)`}
+                    className={`w-7 h-7 rounded-xl flex items-center justify-center transition-all ${
+                      day.active || day.minutes > 0
+                        ? 'bg-primary text-white font-bold shadow-xs'
+                        : day.isToday
+                        ? 'border-2 border-primary text-primary'
+                        : 'bg-gray-200 dark:bg-gray-800 text-gray-400'
+                    }`}
+                  >
+                    {day.active || day.minutes > 0 ? <Check className="w-3.5 h-3.5" /> : '•'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+
+        {/* Card 3: Meaningful Recent Activity (1 Col) */}
+        <Card className="space-y-4">
+          <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-3">
+            <h2 className="text-base font-extrabold text-gray-900 dark:text-white">Recent Activity</h2>
+            <span className="text-[11px] font-bold text-gray-400">Live Stream</span>
+          </div>
+
+          <div className="space-y-3">
+            {displayActivities.length > 0 ? (
+              displayActivities.map((act, index) => (
+                <div key={act.id || index} className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                  <div className="p-2 rounded-xl bg-orange-50 dark:bg-orange-950/40 text-primary shrink-0 mt-0.5">
+                    {act.activity_type === 'CERTIFICATE_EARNED' ? (
+                      <Award className="w-3.5 h-3.5 text-emerald-500" />
+                    ) : act.activity_type === 'LESSON_COMPLETED' ? (
+                      <CheckCircle className="w-3.5 h-3.5 text-primary" />
+                    ) : act.activity_type === 'interview_complete' ? (
+                      <Target className="w-3.5 h-3.5 text-blue-500" />
+                    ) : (
+                      <Activity className="w-3.5 h-3.5 text-purple-500" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-gray-900 dark:text-white line-clamp-1">
+                      {act.title || act.type}
+                    </p>
+                    <p className="text-[10px] text-gray-400 mt-0.5 font-medium">
+                      {act.timestamp ? formatTime(new Date(act.timestamp).getTime()) : 'Recently'}
+                    </p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="p-6 text-center text-gray-400 space-y-2">
+                <Activity className="w-8 h-8 mx-auto text-gray-300" />
+                <p className="text-xs font-medium">No learning activity recorded yet.</p>
+                <button 
+                  onClick={() => navigate('/my-courses')}
+                  className="text-xs font-bold text-primary hover:underline"
+                >
+                  Start your first lesson →
+                </button>
+              </div>
+            )}
+          </div>
+        </Card>
+
+      </div>
+
+      <StartInterviewModal 
+        isOpen={isInterviewModalOpen} 
+        onClose={() => setIsInterviewModalOpen(false)} 
+      />
     </div>
   );
 }

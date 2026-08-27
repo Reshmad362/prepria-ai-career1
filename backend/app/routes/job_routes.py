@@ -12,6 +12,7 @@ job_service = JobService()
 
 class MatchRequest(BaseModel):
     skills: List[str]
+    target_role: Optional[str] = None
 
 @router.get("/", response_model=List[Dict[str, Any]])
 async def get_jobs():
@@ -23,6 +24,6 @@ async def get_jobs():
 @router.post("/match", response_model=List[Dict[str, Any]])
 async def get_matched_jobs(request: MatchRequest):
     try:
-        return job_service.match_jobs_for_user(request.skills)
+        return job_service.match_jobs_for_user(request.skills, request.target_role)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

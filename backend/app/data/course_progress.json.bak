@@ -1,0 +1,30 @@
+{
+  "user-test_course-test-1": {
+    "userId": "user-test",
+    "courseId": "course-test-1",
+    "completedItemIds": [
+      "l1",
+      "q1"
+    ],
+    "quizScores": {
+      "q1": {
+        "score": 100,
+        "passed": true
+      }
+    },
+    "finalAssessment": {
+      "passed": true,
+      "score": 80
+    },
+    "lessonTimeSpent": {
+      "l1": 60,
+      "l2": 59,
+      "q1": 40
+    },
+    "lastAccessed": {},
+    "totalRequiredItems": 3,
+    "completionPercentage": 66,
+    "certificateEligible": false,
+    "updatedAt": "2026-08-19T16:44:08.217481"
+  }
+}

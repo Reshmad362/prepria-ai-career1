@@ -1,8 +1,58 @@
-import React from 'react';
-import { Mail, Key, Shield, Smartphone } from 'lucide-react';
+import React, { useState } from 'react';
+import { Mail, Key, Shield, Smartphone, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
 export default function AccountSecurityCard({ user }) {
-  const email = user?.email || "engineer@example.com";
+  const email = user?.email || '';
+
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [pwStatus, setPwStatus] = useState(null); // { success, message }
+  const [pwLoading, setPwLoading] = useState(false);
+
+  const handleSetPassword = async (e) => {
+    e.preventDefault();
+    setPwStatus(null);
+
+    if (newPassword.length < 8) {
+      setPwStatus({ success: false, message: 'Password must be at least 8 characters.' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPwStatus({ success: false, message: 'Passwords do not match.' });
+      return;
+    }
+
+    setPwLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/auth/set-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ new_password: newPassword, confirm_password: confirmPassword })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setPwStatus({ success: true, message: 'Password set successfully. You can now log in with your email and password.' });
+        setNewPassword('');
+        setConfirmPassword('');
+        setShowPasswordForm(false);
+      } else {
+        setPwStatus({ success: false, message: data.detail || 'Failed to set password.' });
+      }
+    } catch {
+      setPwStatus({ success: false, message: 'Unable to connect. Please try again.' });
+    } finally {
+      setPwLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -19,17 +69,70 @@ export default function AccountSecurityCard({ user }) {
         <button className="btn-secondary !py-2 !px-4 !text-sm whitespace-nowrap">Change Email</button>
       </div>
 
-      <div className="glass-card p-6 flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center flex-shrink-0">
-            <Key className="w-5 h-5 text-on-surface-variant" />
+      <div className="glass-card p-6 flex flex-col gap-4">
+        <div className="flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center flex-shrink-0">
+              <Key className="w-5 h-5 text-on-surface-variant" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-on-surface mb-1">Password</h4>
+              <p className="text-sm text-on-surface-variant">Set or update your login password</p>
+            </div>
           </div>
-          <div>
-            <h4 className="font-semibold text-on-surface mb-1">Password</h4>
-            <p className="text-sm text-on-surface-variant">Last changed 3 months ago</p>
-          </div>
+          <button
+            onClick={() => { setShowPasswordForm(v => !v); setPwStatus(null); }}
+            className="btn-secondary !py-2 !px-4 !text-sm whitespace-nowrap"
+          >
+            {showPasswordForm ? 'Cancel' : 'Set / Update Password'}
+          </button>
         </div>
-        <button className="btn-secondary !py-2 !px-4 !text-sm whitespace-nowrap">Update Password</button>
+
+        {showPasswordForm && (
+          <form onSubmit={handleSetPassword} className="space-y-3 pt-2 border-t border-outline-variant/15">
+            <div className="relative">
+              <input
+                type={showNew ? 'text' : 'password'}
+                placeholder="New password (min. 8 characters)"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                className="w-full px-4 py-3 pr-11 bg-surface-container border border-outline-variant/30 rounded-xl text-sm text-on-surface placeholder-on-surface-variant/50 focus:outline-none focus:border-primary transition-colors"
+              />
+              <button type="button" onClick={() => setShowNew(v => !v)} tabIndex={-1}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface">
+                {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            <div className="relative">
+              <input
+                type={showConfirm ? 'text' : 'password'}
+                placeholder="Confirm new password"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                className="w-full px-4 py-3 pr-11 bg-surface-container border border-outline-variant/30 rounded-xl text-sm text-on-surface placeholder-on-surface-variant/50 focus:outline-none focus:border-primary transition-colors"
+              />
+              <button type="button" onClick={() => setShowConfirm(v => !v)} tabIndex={-1}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface">
+                {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+
+            {pwStatus && (
+              <div className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg ${pwStatus.success ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                {pwStatus.success ? <CheckCircle className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+                <span>{pwStatus.message}</span>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={pwLoading}
+              className="w-full py-2.5 px-4 bg-primary hover:bg-primary/90 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50"
+            >
+              {pwLoading ? 'Saving…' : 'Save Password'}
+            </button>
+          </form>
+        )}
       </div>
 
       <div className="glass-card p-6 flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
@@ -63,7 +166,7 @@ export default function AccountSecurityCard({ user }) {
               <p className="text-sm font-medium text-on-surface">Windows PC • Chrome</p>
               <p className="text-xs text-primary font-medium mt-1">Current Session</p>
             </div>
-            <p className="text-xs text-on-surface-variant">San Francisco, USA</p>
+            <p className="text-xs text-on-surface-variant">Current device</p>
           </div>
         </div>
       </div>

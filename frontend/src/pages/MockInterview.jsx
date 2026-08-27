@@ -198,7 +198,7 @@ export default function MockInterview() {
       // Send Email Notification
       const emailSent = await sendEmailNotification(
         "interview",
-        "Mock Interview Results - AI Career Platform",
+        "Mock Interview Results - PREPRIA Career Intelligence",
         {
           role: role,
           overallScore: overallScore,

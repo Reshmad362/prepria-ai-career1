@@ -1,9 +1,38 @@
+import os
 import logging
+from pathlib import Path
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
+
+logger = logging.getLogger(__name__)
+
+# ── Load .env explicitly into os.environ ─────────────────────────────────────
+def load_env_file():
+    backend_dir = Path(__file__).resolve().parent.parent
+    env_file = backend_dir / ".env"
+    if not env_file.exists():
+        env_file = Path.cwd() / ".env"
+    
+    if env_file.exists():
+        try:
+            with open(env_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    k, v = line.split("=", 1)
+                    k = k.strip()
+                    v = v.strip().strip("'\"")
+                    if k:
+                        os.environ[k] = v
+            logger.info("Successfully loaded environment variables from %s", env_file)
+        except Exception as e:
+            logger.warning("Could not parse .env file: %s", e)
+
+load_env_file()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,6 +52,7 @@ from app.routes.ai_routes import router as ai_router
 from app.routes.email_routes import router as email_router
 from app.routes.document_routes import router as document_router
 from app.routes.job_routes import router as job_router
+
 app = FastAPI(title="AI Career Intelligence Platform")
 
 app.include_router(audio_router)
@@ -39,8 +69,10 @@ app.include_router(role_router)
 app.include_router(interview_router)
 app.include_router(evaluation_router)
 app.include_router(auth_router)
+app.include_router(auth_router, prefix="/api", tags=["API Auth Compatibility"])
 app.include_router(analytics_router)
-if emotion_router: app.include_router(emotion_router)
+if emotion_router:
+    app.include_router(emotion_router)
 app.include_router(career_router)
 app.include_router(ai_router, prefix="/ai", tags=["ai"])
 app.include_router(email_router, prefix="/email", tags=["email"])

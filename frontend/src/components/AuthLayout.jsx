@@ -14,16 +14,16 @@ export default function AuthLayout({ children, title, subtitle }) {
         transition={{ duration: 0.5 }}
         className="text-center mb-8 z-10"
       >
-        {/* Logo placeholder - replace with actual logo if available */}
-        <div className="w-16 h-16 bg-gradient-to-br from-[#FF7A00] to-[#E66D00] rounded-xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-[#FF7A00]/20">
-          <span className="text-white font-bold text-2xl tracking-tighter">AI</span>
+        {/* Logo with PREPRIA orange gradient */}
+        <div className="w-14 h-14 bg-gradient-to-br from-[#FF6B00] to-[#E05D00] rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-lg shadow-[#FF6B00]/25">
+          <span className="text-white font-extrabold text-2xl">P</span>
         </div>
         
-        <h1 className="text-3xl font-bold text-[#111111] mb-3 tracking-tight">
-          {title || "AI Career Intelligence Platform"}
+        <h1 className="text-3xl font-extrabold text-[#111111] dark:text-white mb-2 tracking-tight">
+          {title || "PREPRIA"}
         </h1>
-        <p className="text-gray-500 max-w-md mx-auto text-sm leading-relaxed">
-          {subtitle || "AI-Powered Adaptive Mock Interview & Career Readiness Platform"}
+        <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto text-xs sm:text-sm font-semibold uppercase tracking-wider text-primary">
+          {subtitle || "CAREER INTELLIGENCE"}
         </p>
       </motion.div>
 

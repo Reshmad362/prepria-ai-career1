@@ -93,10 +93,31 @@ export default function OTPVerification() {
             status: "success"
           });
 
-          // Redirect after 1.5 seconds
+          // Check profile status
+          const userEmail = email;
+          let cachedProf = {};
+          let cachedPrefs = {};
+          try {
+            if (userEmail) {
+              cachedProf = JSON.parse(localStorage.getItem(`profile_${userEmail}`) || '{}');
+              cachedPrefs = JSON.parse(localStorage.getItem(`preferences_${userEmail}`) || '{}');
+            }
+          } catch(e) {}
+
+          const phone = userData.profile?.phone || cachedProf?.phone || '';
+          const targetRole = userData.preferences?.targetRole || userData.profile?.targetRole || cachedPrefs?.targetRole || cachedProf?.targetRole || '';
+
+          const hasPhone = phone && phone.trim() !== '' && phone !== 'Not found';
+          const hasTargetRole = targetRole && targetRole.trim() !== '';
+
+          // Redirect after 1.2 seconds
           setTimeout(() => {
-            navigate('/dashboard');
-          }, 1500);
+            if (!hasPhone || !hasTargetRole) {
+              navigate('/onboarding');
+            } else {
+              navigate('/dashboard');
+            }
+          }, 1200);
         }
       } else {
         throw new Error(data.detail || 'Invalid OTP');

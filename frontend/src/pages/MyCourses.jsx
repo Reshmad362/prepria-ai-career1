@@ -1,670 +1,572 @@
 import React, { useState, useEffect, useContext, useMemo } from 'react';
-import { Clock, Flame, Award, Bell, Search, Sparkles, Target, Lightbulb, CheckCircle2, PlayCircle, BookOpen, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { coursesData as coursesDataRaw } from '../data/coursesData';
+import { 
+  Clock, Flame, Award, Search, Sparkles, Target, Lightbulb, 
+  CheckCircle2, PlayCircle, BookOpen, FileText, ArrowRight, 
+  Layers, Check, Compass, ShieldCheck, Filter, X, RefreshCw, ChevronRight, Zap,
+  TrendingUp, BarChart3, GraduationCap, CheckCircle
+} from 'lucide-react';
+import { coursesData, categoryLearningPaths, CATEGORY_CONFIG, normalizeCategorySlug } from '../data/coursesData';
 import { UserContext } from '../contexts/UserContext';
-
-const coursesData = Array.isArray(coursesDataRaw) ? coursesDataRaw : [];
-
-const getSafeData = (key, fallback = []) => {
-  try {
-    return JSON.parse(localStorage.getItem(key)) || fallback;
-  } catch {
-    return fallback;
-  }
-};
+import { getCourseActionState, fetchEngagementMetrics } from '../utils/engagementService';
 
 export default function MyCourses() {
   const navigate = useNavigate();
   const { user, profile, preferences } = useContext(UserContext);
-  const email = user?.email || "guest";
-  const [activeInterest, setActiveInterest] = useState('All');
-  const [activeGroup, setActiveGroup] = useState(null);
+  const email = user?.email || profile?.email || localStorage.getItem('userEmail') || 'guest';
+
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // Temporary debug logs
-  console.log("User:", user);
-  console.log("Courses:", coursesData);
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedDifficulty, setSelectedDifficulty] = useState('All');
+  const [selectedStatus, setSelectedStatus] = useState('All');
+  const [engagement, setEngagement] = useState({
+    currentStreak: 0,
+    learningTime: { thisWeekFormatted: "0m", thisWeekMinutes: 0 },
+    lessonsCompleted: 0,
+    assessmentsPassed: 0,
+    coursesCompleted: 0,
+    certificatesEarned: 0
+  });
 
-  const [activeTab, setActiveTab] = useState(
-    localStorage.getItem("activeTab") || "Explore"
-  ); // Tabs: Explore, Ongoing, Certificates
+  const targetRole = profile?.targetRole || preferences?.targetRole || 'Full Stack Developer';
+  const extractedSkills = profile?.skills || [];
 
+  // Fetch true engagement stats
   useEffect(() => {
-    localStorage.setItem("activeTab", activeTab);
-  }, [activeTab]);
+    const loadEngagement = async () => {
+      const data = await fetchEngagementMetrics(email);
+      if (data) setEngagement(data);
+    };
+    loadEngagement();
+    window.addEventListener('activityLogged', loadEngagement);
+    window.addEventListener('progressUpdated', loadEngagement);
+    return () => {
+      window.removeEventListener('activityLogged', loadEngagement);
+      window.removeEventListener('progressUpdated', loadEngagement);
+    };
+  }, [email]);
 
-  const [insights, setInsights] = useState({});
-  const [streakCount, setStreakCount] = useState(1);
-
-  // Streak tracking logic
-  useEffect(() => {
-    if (!user?.email) return;
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const storedLastVisit = localStorage.getItem(`lastVisitDate_${user.email}`);
-      const storedStreak = parseInt(localStorage.getItem(`streakCount_${user.email}`) || '1', 10);
-      
-      if (!storedLastVisit) {
-        localStorage.setItem(`lastVisitDate_${user.email}`, today);
-        localStorage.setItem(`streakCount_${user.email}`, '1');
-        setStreakCount(1);
-      } else if (storedLastVisit !== today) {
-        const lastVisitDate = new Date(storedLastVisit);
-        const currentDate = new Date(today);
-        const diffTime = Math.abs(currentDate - lastVisitDate);
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
-        if (diffDays === 1) {
-          const newStreak = storedStreak + 1;
-          localStorage.setItem(`lastVisitDate_${user.email}`, today);
-          localStorage.setItem(`streakCount_${user.email}`, newStreak.toString());
-          setStreakCount(newStreak);
-        } else {
-          localStorage.setItem(`lastVisitDate_${user.email}`, today);
-          localStorage.setItem(`streakCount_${user.email}`, '1');
-          setStreakCount(1);
-        }
-      } else {
-        setStreakCount(storedStreak);
-      }
-    } catch (e) {
-      console.error("Streak calculation error", e);
-    }
-  }, [user]);
-
-  // Process courses to append progress data
+  // Process courses with dynamic real-time progress state
   const processedCourses = useMemo(() => {
     return coursesData.map(course => {
-      let progress = { completedModules: [], isCompleted: false };
-      try {
-        const stored = localStorage.getItem(`progress_${course.id}`);
-        if (stored) progress = JSON.parse(stored);
-      } catch (e) {}
+      const actionState = getCourseActionState(course, email);
+      const modulesList = Array.isArray(course.modules) ? course.modules : [];
+      const totalItems = modulesList.reduce((acc, m) => acc + (m.items?.length || 0), 0);
 
-      const totalModules = course.modules?.length || 8; // Fallback to 8 minimum
-      const completedCount = progress.completedModules?.length || 0;
-      let progressPercentage = Math.round((completedCount / totalModules) * 100);
-      
-      if (progressPercentage > 100) progressPercentage = 100;
-      if (progress.isCompleted) progressPercentage = 100;
-      
       let status = 'not-started';
-      if (progress.isCompleted) status = 'completed';
-      else if (completedCount > 0) status = 'in-progress';
+      if (actionState.isCompleted) status = 'completed';
+      else if (actionState.progressPercentage > 0) status = 'in-progress';
 
       return {
         ...course,
-        progressPercentage,
+        progressPercentage: actionState.progressPercentage,
+        completedItemIds: actionState.completedItemIds,
+        targetItemId: actionState.targetItemId,
+        targetModuleIndex: actionState.targetModuleIndex,
+        isCompleted: actionState.isCompleted,
+        actionType: actionState.actionType,
+        buttonLabel: actionState.buttonLabel,
         status,
-        completedCount,
-        totalModules
+        completedItemsCount: actionState.completedItemsCount,
+        totalItems
       };
     });
-  }, []);
-
-  const continueCourses = useMemo(() => processedCourses.filter(c => c.status === 'in-progress'), [processedCourses]);
-  
-  const completedCoursesIds = getSafeData(`completedCourses_${email}`, []);
-  const completedCourses = useMemo(() => {
-    return processedCourses.filter(c => completedCoursesIds.includes(String(c.id)));
-  }, [processedCourses, completedCoursesIds]);
-
-  // PHASE: USER SPECIFIC CERTIFICATES
-  const completedCoursesList = useMemo(() => {
-    if (!email || email === "guest") return [];
-    const stored = getSafeData(`completedCourses_${email}`, []);
-    return stored.map((courseId) => {
-      const course = coursesData.find((c) => String(c.id) === String(courseId));
-      if (!course) return null;
-      const cert = JSON.parse(localStorage.getItem(`cert_${email}_${courseId}`) || "null") || {};
-      return { ...course, cert };
-    }).filter(Boolean);
   }, [email]);
 
-  useEffect(() => {
-    try {
-      if (email !== "guest") {
-        const storedInsights = JSON.parse(localStorage.getItem(`userInsights_${email}`) || '{}');
-        setInsights(storedInsights);
-      }
-    } catch (e) {
-      console.error("Error parsing userInsights", e);
-    }
-  }, [email]);
+  // Overall Statistics
+  const inProgressCourses = processedCourses.filter(c => c.status === 'in-progress');
+  const completedCourses = processedCourses.filter(c => c.status === 'completed');
+  const overallProgress = processedCourses.length > 0
+    ? Math.round(processedCourses.reduce((acc, c) => acc + c.progressPercentage, 0) / processedCourses.length)
+    : 0;
 
-  const filterGroups = {
-    "General": ["All"],
-    "Tech": ["Frontend", "Backend", "Full Stack", "AI / Machine Learning", "Data Science", "Cloud Computing", "Cyber Security", "DevOps", "Software Engineering", "Mobile App Development", "Game Development", "Blockchain / Web3", "IoT (Internet of Things)"],
-    "Non-Tech": ["Finance", "Accounting", "Investment Banking", "Business & Management", "Human Resources (HR)", "Marketing", "Digital Marketing", "Sales", "Product Management", "Operations Management", "Supply Chain Management", "Consulting", "Entrepreneurship", "Business Analytics"],
-    "Creative": ["UI/UX Design", "Graphic Design", "Video Editing", "Animation", "Content Creation", "Social Media Management", "Branding"],
-    "Emerging": ["Generative AI", "Prompt Engineering", "AI Product Management", "Data Engineering", "MLOps", "Cyber Forensics", "AR/VR Development", "Robotics"],
-    "Soft Skills": ["Communication", "Interview Skills", "Resume Building", "Public Speaking", "Leadership", "Time Management", "Critical Thinking", "Problem Solving", "Negotiation Skills", "Emotional Intelligence"]
-  };
+  // Compute dynamic category counts
+  const categoriesList = useMemo(() => {
+    const cats = [
+      'DevOps & Cloud',
+      'Frontend Engineering',
+      'Backend Engineering',
+      'Human Resources',
+      'Marketing',
+      'Data & Analytics'
+    ];
 
-  // PHASE 2 — MAP TARGET ROLE -> DOMAIN
-  const roleToDomainMap = {
-    "Software Engineer": "tech",
-    "Frontend Developer": "tech",
-    "Backend Developer": "tech",
-    "Full Stack Developer": "tech",
-    "Data Scientist": "tech",
-    "Data Analyst": "tech",
-
-    "Investment Banking": "finance",
-    "Financial Analyst": "finance",
-    "Accountant": "finance",
-
-    "HR Manager": "business",
-    "Marketing Manager": "business",
-    "Product Manager": "business",
-    "Business Analyst": "business",
-    "Sales Representative": "business",
-
-    "UI/UX Designer": "creative",
-    "UI Designer": "creative",
-    "Graphic Designer": "creative",
-
-    "AI Engineer": "emerging",
-    "Prompt Engineering": "emerging"
-  };
-
-  // PHASE 3 — FILTER COURSES BASED ON DOMAIN
-  const selectedDomain = useMemo(() => {
-    return roleToDomainMap[preferences?.targetRole] || null;
-  }, [preferences?.targetRole]);
-
-  const domainCourses = useMemo(() => {
-    if (!selectedDomain) return processedCourses;
-    return processedCourses.filter(course => course.domain === selectedDomain);
-  }, [selectedDomain, processedCourses]);
-
-  // PHASE 5 — CATEGORY FILTER INSIDE DOMAIN
-  const visibleFilterGroups = useMemo(() => {
-    if (!selectedDomain) return filterGroups;
-    
-    const availableCategories = new Set(domainCourses.map(c => c.category));
-    
-    const visible = { "General": ["All"] };
-    Object.entries(filterGroups).forEach(([groupName, categories]) => {
-      if (groupName === "General") return;
-      
-      const matchedCategories = categories.filter(cat => availableCategories.has(cat));
-      if (matchedCategories.length > 0) {
-        visible[groupName] = matchedCategories;
-      }
-    });
-    
-    
-    return visible;
-  }, [selectedDomain, domainCourses]);
-
-  // PHASE 6 — DEFAULT STATES
-  useEffect(() => {
-    const groupKeys = Object.keys(visibleFilterGroups);
-    if (groupKeys.length > 0 && !activeGroup) {
-      const firstGroup = groupKeys[0];
-      setActiveGroup(firstGroup);
-      setActiveInterest(visibleFilterGroups[firstGroup][0]);
-    }
-  }, [visibleFilterGroups, activeGroup]);
-
-  const categoryMap = useMemo(() => ({
-    // Tech
-    'react': 'Frontend', 'frontend': 'Frontend', 'nextjs': 'Frontend',
-    'backend': 'Backend', 'node': 'Backend', 'system design': 'Backend', 'microservices': 'Backend',
-    'full stack': 'Full Stack', 
-    'data': 'Data Science', 'python': 'Data Science', 'analysis': 'Data Science',
-    'security': 'Cyber Security', 'cyber': 'Cyber Security',
-    'devops': 'DevOps', 'docker': 'DevOps', 'kubernetes': 'DevOps',
-    'ai': 'AI / Machine Learning', 'ml': 'AI / Machine Learning', 'machine learning': 'AI / Machine Learning',
-    
-    // Non-Tech
-    'finance': 'Finance', 'accounting': 'Accounting', 'investment': 'Investment Banking',
-    'hr': 'Human Resources (HR)', 'recruitment': 'Human Resources (HR)',
-    'marketing': 'Marketing', 'seo': 'Digital Marketing', 'social media': 'Social Media Management',
-    'product': 'Product Management', 'business': 'Business & Management', 'management': 'Business & Management',
-    'sales': 'Sales', 'negotiation': 'Sales',
-
-    // Creative
-    'design': 'UI/UX Design', 'ui': 'UI/UX Design', 'ux': 'UI/UX Design', 'figma': 'UI/UX Design',
-    'video': 'Video Editing', 'content': 'Content Creation',
-
-    // Emerging
-    'generative': 'Generative AI', 'llm': 'Generative AI', 'prompt': 'Prompt Engineering',
-    
-    // Soft Skills
-    'communication': 'Communication', 'speaking': 'Public Speaking',
-    'confidence': 'Interview Skills', 'interview': 'Interview Skills',
-    'leadership': 'Leadership', 'emotional intelligence': 'Emotional Intelligence', 'conflict': 'Emotional Intelligence'
-  }), []);
-
-  const swimlanes = useMemo(() => {
-    const lanes = [];
-
-    // Helper to find courses by keywords
-    const getCoursesByKeywords = (keywords, excludeIds = new Set()) => {
-      const matches = new Map();
-      if (!keywords || !Array.isArray(keywords)) return [];
-      
-      keywords.forEach(kw => {
-        const lowerKw = kw.toLowerCase();
-        for (const [key, category] of Object.entries(categoryMap)) {
-          if (lowerKw.includes(key) || key.includes(lowerKw)) {
-            processedCourses.forEach(course => {
-              if (course.category === category && !excludeIds.has(course.id)) {
-                matches.set(course.id, course);
-              }
-            });
-          }
-        }
-      });
-      return Array.from(matches.values());
+    const counts = {
+      All: processedCourses.length
     };
 
-    const usedIds = new Set();
+    cats.forEach(cat => {
+      counts[cat] = processedCourses.filter(c => c.category === cat).length;
+    });
 
-    // 1. Weak Areas (Focus Areas)
-    if (insights?.weakAreas && insights.weakAreas.length > 0) {
-      const weakCourses = getCoursesByKeywords(insights.weakAreas, usedIds).slice(0, 6);
-      if (weakCourses.length > 0) {
-        lanes.push({
-          title: "Improve Your Focus Areas",
-          icon: Lightbulb,
-          color: "text-yellow-500",
-          courses: weakCourses
+    return [
+      { label: 'All', count: counts.All },
+      ...cats.map(cat => ({ label: cat, count: counts[cat] || 0 }))
+    ];
+  }, [processedCourses]);
+
+  // Personalized Recommended Courses Engine
+  const recommendedCourses = useMemo(() => {
+    const targetLower = targetRole.toLowerCase();
+    const skillsLower = extractedSkills.map(s => s.toLowerCase());
+
+    return processedCourses
+      .map(course => {
+        let score = 0;
+        if (course.priority === 'HIGH PRIORITY') score += 10;
+        
+        // Match career roles
+        if (course.careerRoles?.some(role => targetLower.includes(role.toLowerCase()) || role.toLowerCase().includes(targetLower))) {
+          score += 15;
+        }
+
+        // Match skills
+        course.skillsGained?.forEach(skill => {
+          if (skillsLower.some(s => s.includes(skill.toLowerCase()) || skill.toLowerCase().includes(s))) {
+            score += 5;
+          }
         });
-        weakCourses.forEach(c => usedIds.add(c.id));
-      }
-    }
 
-    // 2. Based on Profile / Role
-    let roleKeywords = [];
-    if (preferences?.targetRole) roleKeywords.push(preferences.targetRole);
-    if (profile?.skills) roleKeywords.push(...profile.skills);
-    
-    if (roleKeywords.length > 0) {
-      const roleCourses = getCoursesByKeywords(roleKeywords, usedIds).slice(0, 6);
-      if (roleCourses.length > 0) {
-        lanes.push({
-          title: "Recommended For You",
-          icon: Target,
-          color: "text-purple-500",
-          courses: roleCourses
-        });
-        roleCourses.forEach(c => usedIds.add(c.id));
-      }
-    }
+        // Priority for matching category domain
+        if (targetLower.includes('cloud') || targetLower.includes('devops')) {
+          if (course.category === 'DevOps & Cloud') score += 8;
+        } else if (targetLower.includes('frontend') || targetLower.includes('react') || targetLower.includes('ui')) {
+          if (course.category === 'Frontend Engineering') score += 8;
+        } else if (targetLower.includes('backend') || targetLower.includes('node') || targetLower.includes('system')) {
+          if (course.category === 'Backend Engineering') score += 8;
+        } else if (targetLower.includes('hr') || targetLower.includes('human') || targetLower.includes('talent')) {
+          if (course.category === 'Human Resources') score += 8;
+        } else if (targetLower.includes('market') || targetLower.includes('growth') || targetLower.includes('brand')) {
+          if (course.category === 'Marketing') score += 8;
+        } else if (targetLower.includes('data') || targetLower.includes('analytics') || targetLower.includes('bi')) {
+          if (course.category === 'Data & Analytics') score += 8;
+        }
 
-    // 3. Domain specific trending
-    if (selectedDomain) {
-      const domainCrs = processedCourses.filter(c => c.domain === selectedDomain && !usedIds.has(c.id)).slice(0, 6);
-      if (domainCrs.length > 0) {
-        lanes.push({
-          title: `Trending in ${selectedDomain.charAt(0).toUpperCase() + selectedDomain.slice(1)}`,
-          icon: Flame,
-          color: "text-orange-500",
-          courses: domainCrs
-        });
-        domainCrs.forEach(c => usedIds.add(c.id));
-      }
-    }
+        return { ...course, recommendationScore: score };
+      })
+      .sort((a, b) => b.recommendationScore - a.recommendationScore)
+      .slice(0, 3);
+  }, [processedCourses, targetRole, extractedSkills]);
 
-    // 4. Just added / Top Rated (Fallback)
-    const topRated = processedCourses.filter(c => !usedIds.has(c.id)).slice(0, 8);
-    if (topRated.length > 0) {
-      lanes.push({
-        title: "Top Rated Courses",
-        icon: Award,
-        color: "text-blue-500",
-        courses: topRated
-      });
-    }
-
-    return lanes;
-  }, [profile, preferences, insights, categoryMap, processedCourses, selectedDomain]);
-
+  // Filter Logic
   const filteredCourses = useMemo(() => {
-    // Search Mode: Filter across ALL processed courses
-    if (searchQuery.trim() !== '') {
-      const query = searchQuery.toLowerCase().trim();
-      const results = processedCourses.filter(course => {
-        return (
-          course.title?.toLowerCase().includes(query) ||
-          course.category?.toLowerCase().includes(query) ||
-          course.description?.toLowerCase().includes(query) ||
-          course.level?.toLowerCase().includes(query) ||
-          (course.skills && course.skills.some(skill => skill.toLowerCase().includes(query)))
-        );
-      });
-      // Temporary debug log
-      console.log("SearchQuery:", searchQuery);
-      console.log("FilteredCourses:", results);
-      return results;
+    return processedCourses.filter(c => {
+      const q = searchQuery.toLowerCase().trim();
+      const matchesSearch = !q || 
+        c.title.toLowerCase().includes(q) ||
+        c.category.toLowerCase().includes(q) ||
+        c.description.toLowerCase().includes(q) ||
+        (c.subcategory && c.subcategory.toLowerCase().includes(q)) ||
+        c.skillsGained.some(s => s.toLowerCase().includes(q)) ||
+        (c.careerRoles && c.careerRoles.some(r => r.toLowerCase().includes(q))) ||
+        (c.modules && c.modules.some(m => 
+          m.title.toLowerCase().includes(q) || 
+          (m.items && m.items.some(i => i.title.toLowerCase().includes(q)))
+        ));
+
+      const matchesCategory = selectedCategory === 'All' || c.category.toLowerCase() === selectedCategory.toLowerCase();
+      const matchesDifficulty = selectedDifficulty === 'All' || c.level.toLowerCase() === selectedDifficulty.toLowerCase();
+      const matchesStatus = selectedStatus === 'All' || 
+        (selectedStatus === 'in-progress' && c.status === 'in-progress') ||
+        (selectedStatus === 'completed' && c.status === 'completed') ||
+        (selectedStatus === 'not-started' && c.status === 'not-started');
+
+      return matchesSearch && matchesCategory && matchesDifficulty && matchesStatus;
+    });
+  }, [processedCourses, searchQuery, selectedCategory, selectedDifficulty, selectedStatus]);
+
+  // Primary active course to continue
+  const primaryActiveCourse = inProgressCourses[0] || recommendedCourses[0] || processedCourses[0];
+
+  const handleCourseAction = (e, course) => {
+    e.stopPropagation();
+    if (course.actionType === 'CERTIFICATE') {
+      navigate(`/certificate/${course.id}`);
+    } else if (course.actionType === 'CONTINUE' || course.actionType === 'START' || course.actionType === 'REVIEW') {
+      navigate(`/course/${course.id}?item=${course.targetItemId || ''}`);
+    } else {
+      navigate(`/courses/${course.id}`);
     }
+  };
 
-    // PHASE 2 — FIX FILTERING (NO MIXING)
-    if (!activeInterest || activeInterest === 'All') return [];
-    
-    return domainCourses.filter(course => course.category === activeInterest);
-  }, [activeInterest, domainCourses, searchQuery, processedCourses]);
+  const currentPathMeta = selectedCategory !== 'All' ? categoryLearningPaths[selectedCategory] : null;
 
-  if (!coursesData || coursesData.length === 0) {
-    return <div className="flex justify-center items-center h-64 text-lg font-bold text-gray-500">Loading courses...</div>;
-  }
-
-  try {
   return (
-    <div className="font-sans pb-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full animate-in fade-in zoom-in-95 duration-500">
+    <div className="max-w-6xl mx-auto space-y-8 pb-16 animate-in fade-in slide-in-from-bottom-4 duration-500 font-manrope">
       
-      {/* TOP STATUS BAR */}
-      <div className="flex flex-wrap items-center justify-between gap-4 mt-6 mb-8 bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-border">
-        <div className="flex flex-wrap items-center gap-4 sm:gap-6">
-          <div className="flex items-center gap-2 px-4 py-2 bg-orange-50 dark:bg-orange-900/20 text-orange-600 rounded-xl font-bold text-sm sm:text-base">
-            <Flame className="w-5 h-5 text-orange-500" /> {streakCount} Days Streak
-          </div>
-          <div className="flex items-center gap-2 px-4 py-2 bg-green-50 dark:bg-green-900/20 text-green-600 rounded-xl font-bold text-sm sm:text-base">
-            <Award className="w-5 h-5 text-green-500" /> Complete Profile 100%
-          </div>
-        </div>
-      </div>
+      {/* ==================================================
+          1. HERO DASHBOARD & CAREER PROGRESS SUMMARY
+      ================================================== */}
+      <div className="bg-white dark:bg-[#111215] rounded-3xl p-6 sm:p-8 border border-gray-200 dark:border-white/[0.08] shadow-xs space-y-6 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-[#FF6B00]/[0.04] rounded-full blur-3xl pointer-events-none" />
 
-      <div className="mb-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-          <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white">My Courses</h1>
-          
-          <div className="flex p-1 bg-gray-100 dark:bg-gray-800/80 rounded-xl overflow-x-auto scrollbar-hide">
-             {['Explore', 'Ongoing', 'Certificates'].map(tab => (
-                <button
-                   key={tab}
-                   onClick={() => setActiveTab(tab)}
-                   className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all whitespace-nowrap ${
-                      activeTab === tab 
-                      ? 'bg-white dark:bg-gray-700 text-purple-600 shadow-sm' 
-                      : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-200/50 dark:hover:bg-gray-800'
-                   }`}
-                >
-                   {tab}
-                </button>
-             ))}
-          </div>
-        </div>
-      </div>
-
-      {activeTab === 'Explore' && (
-        <>
-          {/* CONTINUE LEARNING */}
-          {continueCourses.length > 0 && !searchQuery && (
-          <div className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h2 className="text-2xl font-extrabold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-              <PlayCircle className="w-6 h-6 text-indigo-500" /> Continue Learning
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {continueCourses?.length > 0 ? (
-                continueCourses.map(course => (
-                <div key={`continue-${course.id}`} className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 border border-indigo-100 dark:border-indigo-900/30 flex flex-col h-full relative overflow-hidden group cursor-pointer" onClick={() => navigate(`/courses/${course.id}`)}>
-                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
-                  
-                  <div className="flex justify-between items-start mb-4">
-                    <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-indigo-100 dark:border-indigo-800">{course.category}</span>
-                  </div>
-                  <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-2 line-clamp-2 group-hover:text-indigo-600 transition-colors">{course.title}</h3>
-                  <p className="text-sm text-gray-500 mb-6 flex-1 line-clamp-2">{course.description}</p>
-                  
-                  <div className="mt-auto">
-                    <div className="flex justify-between text-xs font-bold text-gray-500 mb-2">
-                      <span>Progress</span>
-                      <span className="text-indigo-600 dark:text-indigo-400">{course.progressPercentage}%</span>
-                    </div>
-                    <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 mb-4">
-                      <div className="bg-gradient-to-r from-indigo-500 to-purple-500 h-2 rounded-full transition-all duration-500" style={{ width: `${course.progressPercentage}%` }}></div>
-                    </div>
-                    <button className="w-full py-2 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-bold rounded-xl transition-colors text-sm flex items-center justify-center gap-2">
-                      <PlayCircle className="w-4 h-4" /> Continue
-                    </button>
-                  </div>
-                </div>
-              ))) : (
-                <div className="col-span-full text-center text-gray-500">No ongoing courses available</div>
-              )}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 dark:border-gray-800 pb-6">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-orange-50 dark:bg-orange-950/40 text-primary border border-orange-200 dark:border-orange-900/30 uppercase tracking-wider">
+                <Sparkles className="w-3 h-3" /> AI Career Learning Hub
+              </span>
             </div>
-          </div>
-        )}
-
-        {/* COMPLETED COURSES */}
-        {completedCourses?.length > 0 && !searchQuery && (
-          <div className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h2 className="text-2xl font-extrabold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-              <CheckCircle2 className="w-6 h-6 text-green-500" /> Completed Courses
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {completedCourses?.length > 0 ? (
-                completedCourses.map(course => (
-                <div key={`completed-${course.id}`} className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 border border-green-100 dark:border-green-900/30 flex flex-col h-full relative overflow-hidden group">
-                  <div className="absolute top-0 left-0 w-full h-1 bg-green-500"></div>
-                  
-                  <div className="flex justify-between items-start mb-4">
-                    <span className="px-3 py-1 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-green-200 dark:border-green-800 flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" /> Completed
-                    </span>
-                  </div>
-                  <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-2 line-clamp-2">{course.title}</h3>
-                  <p className="text-sm text-gray-500 mb-6 flex-1 line-clamp-2">{course.description}</p>
-                  
-                  <div className="mt-auto">
-                    <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 mb-4">
-                      <div className="bg-green-500 h-2 rounded-full" style={{ width: `100%` }}></div>
-                    </div>
-                    <button 
-                      onClick={() => navigate(`/courses/${course.id}`)}
-                      className="w-full py-2 bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-bold rounded-xl transition-colors text-sm"
-                    >
-                      Review Course
-                    </button>
-                  </div>
-                </div>
-              ))) : (
-                <div className="col-span-full text-center text-gray-500">No completed courses</div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* SEARCH AND FILTERS */}
-        <div className="mb-2">
-          <div className="relative mb-6">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <Search className="h-5 w-5 text-gray-400" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search courses by title or category"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-11 pr-4 py-4 rounded-2xl border border-border bg-white dark:bg-gray-800 text-text outline-none focus:ring-2 focus:ring-purple-500/50 shadow-sm transition-all"
-            />
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight mt-1.5">
+              Your Learning Hub
+            </h1>
+            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-2xl">
+              Master role-verified skills across technology, human resources, marketing, and data analytics with pedagogical AI courses.
+            </p>
           </div>
 
-        {processedCourses.length === 0 && (
-          <div className="text-center text-gray-500 my-12">
-            No courses available. Reloading...
-          </div>
-        )}
-
-          {/* SWIMLANES (Netflix Style) */}
-          <div className="flex flex-col gap-10 mb-12">
-            {searchQuery.trim() !== '' ? (
-              <div className="animate-in fade-in slide-in-from-top-4 duration-500">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-                  <Search className="w-5 h-5 text-purple-500" /> Search Results for "{searchQuery}"
-                </h2>
-                {filteredCourses.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {filteredCourses.map(course => (
-                      <div key={course.id} className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 border border-border flex flex-col h-full relative overflow-hidden group cursor-pointer" onClick={() => navigate(`/courses/${course.id}`)}>
-                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-blue-500 transform origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-300"></div>
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="flex gap-2">
-                            <span className="px-3 py-1 bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-purple-100 dark:border-purple-800">{course.category}</span>
-                            {course.status === 'completed' && <span className="px-2 py-1 bg-green-100 text-green-700 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/> Completed</span>}
-                            {course.status === 'in-progress' && <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center gap-1"><Clock className="w-3 h-3"/> {course.progressPercentage}%</span>}
-                          </div>
-                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-md">{course.level}</span>
-                        </div>
-                        <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-2 line-clamp-2 group-hover:text-purple-600 transition-colors">{course.title}</h3>
-                        <p className="text-sm text-gray-500 mb-6 flex-1 line-clamp-3">{course.description}</p>
-                        <div className="flex items-center justify-between mt-auto pt-4 border-t border-border">
-                          <span className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
-                            <Clock className="w-4 h-4 text-purple-500" /> {course.duration}
-                          </span>
-                          <button className="px-4 py-2 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-900/40 text-purple-700 dark:text-purple-300 font-bold rounded-xl transition-colors text-sm">
-                            View Details
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-2xl border border-border shadow-sm">
-                    <Search className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-                    <p className="text-gray-500 max-w-md mx-auto text-lg font-bold">No matching courses found.</p>
-                    <p className="text-gray-400 mt-2 text-sm">Try using different keywords or check your spelling.</p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              swimlanes.map((lane, idx) => (
-                <div key={idx} className="relative group animate-in fade-in duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
-                  <h2 className="text-xl font-extrabold text-gray-900 dark:text-white mb-4 flex items-center gap-2 px-2">
-                    <lane.icon className={`w-6 h-6 ${lane.color}`} /> {lane.title}
-                  </h2>
-                  <div className="flex gap-6 overflow-x-auto pb-6 scrollbar-hide snap-x px-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                    {lane.courses.map(course => (
-                      <div 
-                        key={course.id} 
-                        onClick={() => navigate(`/courses/${course.id}`)}
-                        className="snap-start shrink-0 w-80 bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-gray-700 flex flex-col h-full relative overflow-hidden cursor-pointer group/card hover:-translate-y-1"
-                      >
-                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-blue-500 transform origin-left scale-x-0 group-hover/card:scale-x-100 transition-transform duration-300"></div>
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="flex gap-2">
-                            <span className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-[10px] font-bold uppercase tracking-wider">{course.category}</span>
-                            {course.status === 'completed' && <span className="px-2 py-1 bg-green-100 text-green-700 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/> Completed</span>}
-                          </div>
-                          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{course.level}</span>
-                        </div>
-                        <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-2 line-clamp-2 group-hover/card:text-purple-600 transition-colors">{course.title}</h3>
-                        <p className="text-sm text-gray-500 mb-6 flex-1 line-clamp-2">{course.description}</p>
-                        
-                        <div className="flex items-center justify-between mt-auto pt-4 border-t border-gray-100 dark:border-gray-700">
-                          <span className="text-sm font-medium text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
-                            <Clock className="w-4 h-4 text-purple-500" /> {course.duration}
-                          </span>
-                          <div className="w-8 h-8 rounded-full bg-purple-50 dark:bg-purple-900/20 text-purple-600 flex items-center justify-center group-hover/card:bg-purple-500 group-hover/card:text-white transition-colors">
-                            <PlayCircle className="w-5 h-5" />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))
+          <div className="flex items-center gap-2.5">
+            {primaryActiveCourse && (
+              <button
+                onClick={(e) => handleCourseAction(e, primaryActiveCourse)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary hover:bg-primaryHover text-white text-xs sm:text-sm font-bold shadow-md shadow-primary/25 hover:shadow-lg transition-all cursor-pointer"
+              >
+                <PlayCircle className="w-4 h-4" />
+                <span>{primaryActiveCourse.buttonLabel}</span>
+              </button>
             )}
           </div>
         </div>
-        </>
-      )}
 
-      {activeTab === 'Ongoing' && (
-        <div className="animate-in fade-in zoom-in-95 duration-500">
-           {continueCourses.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                 {continueCourses.map(course => (
-                   <div key={`ongoing-${course.id}`} className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-md border border-indigo-100 dark:border-indigo-900/30 flex flex-col h-full relative overflow-hidden group cursor-pointer" onClick={() => navigate(`/courses/${course.id}`)}>
-                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
-                     <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-indigo-100 dark:border-indigo-800 mb-4 self-start">{course.category}</span>
-                     <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-2 line-clamp-2">{course.title}</h3>
-                     <p className="text-sm text-gray-500 mb-6 flex-1 line-clamp-2">{course.description}</p>
-                     <div className="mt-auto">
-                       <div className="flex justify-between text-xs font-bold text-gray-500 mb-2">
-                         <span>Progress</span>
-                         <span className="text-indigo-600 dark:text-indigo-400">{course.progressPercentage}%</span>
-                       </div>
-                       <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 mb-4">
-                         <div className="bg-gradient-to-r from-indigo-500 to-purple-500 h-2 rounded-full" style={{ width: `${course.progressPercentage}%` }}></div>
-                       </div>
-                       <button className="w-full py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl transition-colors text-sm flex items-center justify-center gap-2">
-                         <PlayCircle className="w-4 h-4" /> Continue Learning
-                       </button>
-                     </div>
-                   </div>
-                 ))}
-              </div>
-           ) : (
-             <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700">
-                <PlayCircle className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No Ongoing Courses</h3>
-                <p className="text-gray-500 mb-6">Start a course from the Explore tab to see it here.</p>
-                <button onClick={() => setActiveTab('Explore')} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors">
-                   Explore Courses
-                </button>
-             </div>
-           )}
+        {/* Compact Personalized Summary Bar */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-1">
+          <div className="p-3.5 rounded-2xl bg-gray-50/80 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400 block">Target Role</span>
+            <span className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white truncate block mt-0.5">
+              {targetRole}
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-gray-50/80 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400 block">Total Catalog</span>
+            <span className="text-xs sm:text-sm font-bold text-primary block mt-0.5">
+              {coursesData.length} Courses
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-gray-50/80 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400 block">Active Courses</span>
+            <span className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white block mt-0.5">
+              {inProgressCourses.length} In Progress
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-gray-50/80 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400 block">Completed</span>
+            <span className="text-xs sm:text-sm font-bold text-emerald-600 dark:text-emerald-400 block mt-0.5">
+              {completedCourses.length} Certified
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-2xl bg-gray-50/80 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800 col-span-2 sm:col-span-1">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400 block">Current Streak</span>
+            <span className="text-xs sm:text-sm font-bold text-orange-600 dark:text-orange-400 flex items-center gap-1 mt-0.5">
+              <Flame className="w-3.5 h-3.5 fill-orange-500" /> {engagement.currentStreak} Days
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ==================================================
+          2. AI LEARNING INSIGHT & ROADMAP CONNECTION
+      ================================================== */}
+      {primaryActiveCourse && (
+        <div className="bg-gradient-to-br from-[#111215] to-[#1C1E26] rounded-3xl p-6 sm:p-7 text-white shadow-xl relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 border border-white/[0.06]">
+          <div className="absolute top-0 right-0 w-72 h-72 bg-[#FF6B00]/15 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="space-y-1.5 max-w-xl z-10">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/20 border border-orange-500/30 text-[#FF6B00] text-[10px] font-extrabold uppercase tracking-wider">
+              <Zap className="w-3 h-3" />
+              <span>AI Career Roadmap Insight</span>
+            </div>
+            <h2 className="text-lg sm:text-xl font-extrabold tracking-tight">
+              Prioritized for {targetRole} Roadmap
+            </h2>
+            <p className="text-xs text-gray-300 leading-relaxed font-normal">
+              Based on your resume and current roadmap milestone, your highest-leverage learning area is <strong className="text-white font-bold">{primaryActiveCourse.title}</strong> to close verified skill gaps.
+            </p>
+            <div className="flex items-center gap-4 text-[11px] text-gray-400 pt-1">
+              <span>Career Impact: <strong className="text-emerald-400">{primaryActiveCourse.careerImpact?.readinessBoost || '+8% Placement Readiness'}</strong></span>
+              <span>•</span>
+              <span>Est. Duration: <strong className="text-gray-300">{primaryActiveCourse.duration}</strong></span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 z-10 shrink-0 self-end sm:self-center">
+            <button
+              onClick={(e) => handleCourseAction(e, primaryActiveCourse)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary hover:bg-primaryHover text-white text-xs sm:text-sm font-bold shadow-lg shadow-primary/30 hover:-translate-y-0.5 transition-all cursor-pointer"
+            >
+              <span>{primaryActiveCourse.buttonLabel}</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
 
-      {activeTab === 'Certificates' && (
-        <div className="animate-in fade-in zoom-in-95 duration-500">
-           {completedCoursesList.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                 {completedCoursesList.map(course => {
-                    const issueDate = course.cert?.completedAt ? new Date(course.cert.completedAt).toLocaleDateString() : "Recently";
-
-                    return (
-                       <div key={`cert-${course.id}`} className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 p-6 rounded-2xl shadow-lg border border-yellow-200 dark:border-yellow-900/30 flex flex-col h-full relative overflow-hidden group">
-                         <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                            <Award className="w-24 h-24 text-yellow-500" />
-                         </div>
-                         <div className="relative z-10 flex flex-col h-full">
-                            <div className="flex items-center gap-2 mb-4">
-                               <Award className="w-6 h-6 text-yellow-500" />
-                               <span className="text-sm font-bold text-gray-500 uppercase tracking-wider">Verified Certificate</span>
-                            </div>
-                            <h3 className="font-bold text-xl text-gray-900 dark:text-white mb-2">{course.title}</h3>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6 flex-1">Issued on: {issueDate}</p>
-                            
-                            <button 
-                              onClick={() => navigate(`/certificate/${course.id}`)}
-                              className="w-full py-3 bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-white font-bold rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
-                            >
-                              <FileText className="w-5 h-5" /> View Certificate
-                            </button>
-                         </div>
-                       </div>
-                    );
-                 })}
+      {/* ==================================================
+          3. CATEGORY DOMAIN PATHWAY BANNER (WHEN CATEGORY SELECTED)
+      ================================================== */}
+      {currentPathMeta && (
+        <div className={`rounded-3xl p-6 sm:p-7 border border-gray-200 dark:border-white/[0.08] bg-gradient-to-r ${currentPathMeta.color} dark:bg-[#111215] shadow-xs space-y-4`}>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-md border ${currentPathMeta.badgeColor}`}>
+                  {selectedCategory} Career Learning Path
+                </span>
+                <span className="text-xs font-bold text-gray-500">
+                  {filteredCourses.length} Courses Available
+                </span>
               </div>
-           ) : (
-             <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm">
-                <Award className="w-16 h-16 text-yellow-300 dark:text-yellow-600/50 mx-auto mb-4" />
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">No Certificates Yet</h3>
-                <p className="text-gray-500 max-w-md mx-auto mb-6">Complete a course 100% to unlock your professional, industry-grade certificate.</p>
-                <button onClick={() => setActiveTab('Explore')} className="px-6 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-xl transition-colors">
-                   Find a Course
-                </button>
-             </div>
-           )}
+              <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+                {currentPathMeta.title}
+              </h2>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 mt-1 max-w-2xl">
+                {currentPathMeta.tagline}
+              </p>
+            </div>
+          </div>
+
+          {/* Stepped Learning Progression Bar */}
+          <div className="pt-2 border-t border-gray-200/60 dark:border-gray-800/60">
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400 block mb-2">
+              Structured Pathway Progression
+            </span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
+              {currentPathMeta.steps.map((step, idx) => (
+                <div 
+                  key={idx} 
+                  className="p-2.5 rounded-xl bg-white dark:bg-gray-900/80 border border-gray-200/80 dark:border-gray-800 flex flex-col justify-between"
+                >
+                  <span className="text-[9px] font-extrabold text-primary block">STEP 0{idx + 1}</span>
+                  <span className="text-[11px] font-bold text-gray-800 dark:text-gray-200 leading-tight mt-1">
+                    {step}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
+
+      {/* ==================================================
+          4. SEARCH & CATEGORY FILTER TABS
+      ================================================== */}
+      <div className="space-y-4">
+        
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          
+          {/* Search Bar */}
+          <div className="w-full sm:w-80 relative">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+              <Search className="w-4 h-4" />
+            </div>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search courses, modules, skills..."
+              className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white dark:bg-[#111215] border border-gray-200 dark:border-white/[0.08] text-xs font-medium text-gray-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-primary shadow-2xs"
+            />
+            {searchQuery && (
+              <button 
+                onClick={() => setSearchQuery('')}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Difficulty & Status Selectors */}
+          <div className="flex items-center gap-2 self-stretch sm:self-auto overflow-x-auto pb-1 sm:pb-0">
+            <select
+              value={selectedDifficulty}
+              onChange={(e) => setSelectedDifficulty(e.target.value)}
+              className="px-3 py-2 rounded-xl bg-white dark:bg-[#111215] border border-gray-200 dark:border-white/[0.08] text-xs font-bold text-gray-700 dark:text-gray-300 focus:outline-hidden cursor-pointer"
+            >
+              <option value="All">All Levels</option>
+              <option value="Beginner">Beginner</option>
+              <option value="Intermediate">Intermediate</option>
+              <option value="Advanced">Advanced</option>
+            </select>
+
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="px-3 py-2 rounded-xl bg-white dark:bg-[#111215] border border-gray-200 dark:border-white/[0.08] text-xs font-bold text-gray-700 dark:text-gray-300 focus:outline-hidden cursor-pointer"
+            >
+              <option value="All">All Status</option>
+              <option value="in-progress">In Progress</option>
+              <option value="completed">Completed</option>
+              <option value="not-started">Not Started</option>
+            </select>
+          </div>
+
+        </div>
+
+        {/* Category Filter Chips with Dynamic Counts */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          {categoriesList.map((catObj) => (
+            <button
+              key={catObj.label}
+              onClick={() => setSelectedCategory(catObj.label)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                selectedCategory === catObj.label
+                  ? 'bg-primary text-white shadow-xs'
+                  : 'bg-white dark:bg-[#111215] border border-gray-200 dark:border-white/[0.08] text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+              }`}
+            >
+              <span>{catObj.label}</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                selectedCategory === catObj.label
+                  ? 'bg-white/20 text-white'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-500'
+              }`}>
+                {catObj.count}
+              </span>
+            </button>
+          ))}
+        </div>
+
+      </div>
+
+      {/* ==================================================
+          5. COURSE GRID (INFORMATION-DENSE CARDS)
+      ================================================== */}
+      {filteredCourses.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredCourses.map((course) => {
+            const isCompleted = course.status === 'completed';
+
+            return (
+              <div
+                key={course.id}
+                onClick={() => navigate(`/courses/${course.id}`)}
+                className="bg-white dark:bg-[#111215] rounded-3xl p-6 border border-gray-200 dark:border-white/[0.08] shadow-xs hover:shadow-md transition-all flex flex-col justify-between space-y-4 group cursor-pointer"
+              >
+                <div>
+                  {/* Top Metadata Strip */}
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700">
+                      {course.category}
+                    </span>
+                    <span className={`text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-md border ${
+                      course.priority === 'HIGH PRIORITY'
+                        ? 'bg-orange-50 dark:bg-orange-950/40 text-primary border-orange-200 dark:border-orange-900/30'
+                        : isCompleted
+                        ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border-emerald-200'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-500 border-gray-200'
+                    }`}>
+                      {isCompleted ? '✓ Completed' : course.level}
+                    </span>
+                  </div>
+
+                  {/* Course Title & Description */}
+                  <h3 
+                    className="text-base font-extrabold text-gray-900 dark:text-white group-hover:text-primary transition-colors leading-tight"
+                  >
+                    {course.title}
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 line-clamp-2 leading-relaxed">
+                    {course.description}
+                  </p>
+
+                  {/* Skills Pill Row */}
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    {course.skillsGained.slice(0, 3).map((sk, i) => (
+                      <span key={i} className="text-[10px] font-semibold px-2 py-0.5 rounded bg-gray-50 dark:bg-gray-800/80 text-gray-600 dark:text-gray-300 border border-gray-100 dark:border-gray-800">
+                        {sk}
+                      </span>
+                    ))}
+                    {course.skillsGained.length > 3 && (
+                      <span className="text-[10px] font-semibold text-gray-400 px-1 py-0.5">
+                        +{course.skillsGained.length - 3} more
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Why This is Recommended Callout */}
+                  {course.whyRecommended && (
+                    <div className="mt-3.5 p-3 rounded-2xl bg-orange-50/40 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/30 text-[11px] text-gray-700 dark:text-gray-300">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-primary block mb-0.5">
+                        Why Recommended:
+                      </span>
+                      <p className="line-clamp-2 leading-tight">
+                        {course.whyRecommended}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  {/* Progress Bar */}
+                  <div className="space-y-1.5 pt-3 border-t border-gray-100 dark:border-gray-800">
+                    <div className="flex justify-between text-[11px] font-bold">
+                      <span className="text-gray-400">{course.duration} • {course.estimatedHours || '12 Hours'}</span>
+                      <span className={isCompleted ? 'text-emerald-600' : 'text-primary'}>
+                        {course.progressPercentage}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5 overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full ${isCompleted ? 'bg-emerald-500' : 'bg-primary'}`}
+                        style={{ width: `${course.progressPercentage}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Action Button */}
+                  <div className="pt-3">
+                    <button
+                      type="button"
+                      onClick={(e) => handleCourseAction(e, course)}
+                      className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs ${
+                        course.actionType === 'CERTIFICATE'
+                          ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-300 hover:bg-emerald-100'
+                          : course.actionType === 'CONTINUE'
+                          ? 'bg-primary hover:bg-primaryHover text-white'
+                          : 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-primary dark:hover:bg-primary dark:hover:text-white'
+                      }`}
+                    >
+                      {course.actionType === 'CERTIFICATE' && <Award className="w-3.5 h-3.5" />}
+                      <span>{course.buttonLabel}</span>
+                      {course.actionType !== 'CERTIFICATE' && <ChevronRight className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        /* Empty State */
+        <div className="p-12 text-center bg-white dark:bg-[#111215] rounded-3xl border border-dashed border-gray-200 dark:border-gray-800 space-y-4">
+          <BookOpen className="w-10 h-10 text-gray-300 mx-auto" />
+          <div>
+            <h3 className="text-base font-extrabold text-gray-900 dark:text-white">
+              No courses match your active search
+            </h3>
+            <p className="text-xs text-gray-500 mt-1">
+              Try adjusting your keyword query or resetting your difficulty filters.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              setSearchQuery('');
+              setSelectedCategory('All');
+              setSelectedDifficulty('All');
+              setSelectedStatus('All');
+            }}
+            className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primaryHover transition-all cursor-pointer"
+          >
+            Clear Filters
+          </button>
+        </div>
+      )}
+
     </div>
   );
-  } catch (error) {
-    console.error("MyCourses crash:", error);
-    return (
-      <div className="flex flex-col items-center justify-center h-64 text-center">
-        <h2 className="text-2xl font-bold text-red-500 mb-4">Something went wrong.</h2>
-        <p className="text-gray-500 mb-6">We encountered an error loading your courses. Please try again later.</p>
-      </div>
-    );
-  }
 }

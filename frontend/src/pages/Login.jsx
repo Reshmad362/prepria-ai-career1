@@ -31,8 +31,21 @@ export default function Login() {
       status: "success"
     });
 
-    const hasPhone = userData.profile?.phone && userData.profile.phone.trim() !== '' && userData.profile.phone !== 'Not found';
-    const hasTargetRole = userData.preferences?.targetRole && userData.preferences.targetRole.trim() !== '';
+    const userEmail = userData.email;
+    let cachedProf = {};
+    let cachedPrefs = {};
+    try {
+      if (userEmail) {
+        cachedProf = JSON.parse(localStorage.getItem(`profile_${userEmail}`) || '{}');
+        cachedPrefs = JSON.parse(localStorage.getItem(`preferences_${userEmail}`) || '{}');
+      }
+    } catch(e) {}
+
+    const phone = userData.profile?.phone || cachedProf?.phone || '';
+    const targetRole = userData.preferences?.targetRole || userData.profile?.targetRole || cachedPrefs?.targetRole || cachedProf?.targetRole || '';
+
+    const hasPhone = phone && phone.trim() !== '' && phone !== 'Not found';
+    const hasTargetRole = targetRole && targetRole.trim() !== '';
 
     if (!hasPhone || !hasTargetRole) {
       navigate('/onboarding');

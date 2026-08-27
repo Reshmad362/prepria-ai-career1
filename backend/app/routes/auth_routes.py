@@ -1,11 +1,30 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Header
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Dict, Any
 import re
+import uuid
 import logging
 import traceback
-from app.services.auth_service import create_user, authenticate_user, generate_token, users_db, verify_google_token, google_login as google_login_service, generate_reset_token, reset_password, otp_manager
-from app.services.email_service import send_notification_email
+from app.services.auth_service import (
+    create_user,
+    authenticate_user,
+    generate_token,
+    decode_token,
+    get_user_by_email_or_id,
+    update_user_profile,
+    users_db,
+    _save_users_to_disk,
+    verify_google_token,
+    google_login as google_login_service,
+    generate_reset_token,
+    reset_password,
+    otp_manager
+)
+from app.services.email_service import (
+    send_notification_email,
+    get_email_credentials,
+    is_development_mode
+)
 
 logger = logging.getLogger(__name__)
 
@@ -16,10 +35,26 @@ def is_valid_email(email: str) -> bool:
     return bool(re.match(pattern, email))
 
 def find_user_by_email(email: str):
+    email_clean = email.strip().lower()
     for u in users_db:
-        if u['email'] == email:
+        if u.get('email', '').strip().lower() == email_clean:
             return u
     return None
+
+def get_current_user_from_header(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid authentication token")
+    token = authorization.split("Bearer ")[1].strip()
+    payload = decode_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired session token")
+    
+    email = payload.get("email")
+    user_id = payload.get("sub")
+    user = get_user_by_email_or_id(email=email, user_id=user_id)
+    if not user:
+        raise HTTPException(status_code=401, detail="User session expired. Please log in again.")
+    return user
 
 class SignupRequest(BaseModel):
     name: str
@@ -51,6 +86,102 @@ class VerifyOTPRequest(BaseModel):
     email: str
     otp: str
     purpose: str = "LOGIN"
+
+class ProfileUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    gender: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    pincode: Optional[str] = None
+    picture: Optional[str] = None
+    targetRole: Optional[str] = None
+    techStack: Optional[str] = None
+    careerGoals: Optional[str] = None
+    workPreference: Optional[str] = None
+    experienceLevel: Optional[str] = None
+    preferredCompanies: Optional[str] = None
+    learningFocus: Optional[List[str]] = None
+    skills: Optional[List[str]] = None
+    score: Optional[int] = None
+    experience: Optional[Any] = None
+    projects: Optional[Any] = None
+    education: Optional[Any] = None
+    resumeUploaded: Optional[bool] = None
+    resumeFileName: Optional[str] = None
+
+@router.get("/profile")
+@router.get("/me")
+async def get_current_user_info(authorization: Optional[str] = Header(None)):
+    user = get_current_user_from_header(authorization)
+    return {
+        "success": True,
+        "profile": user.get("profile", {}),
+        "preferences": user.get("preferences", {}),
+        "user": {
+            "id": user.get("id"),
+            "email": user.get("email"),
+            "name": user.get("name"),
+            "picture": user.get("picture"),
+            "profile": user.get("profile", {}),
+            "preferences": user.get("preferences", {}),
+            "scoreHistory": user.get("scoreHistory", [])
+        }
+    }
+
+@router.put("/profile")
+@router.post("/profile")
+@router.put("/me")
+async def update_profile_route(req: ProfileUpdateRequest, authorization: Optional[str] = Header(None)):
+    user = get_current_user_from_header(authorization)
+    email = user["email"]
+    existing_prof = user.get("profile", {})
+    
+    profile_data = {
+        "name": req.name if req.name is not None else user.get("name", ""),
+        "email": email,
+        "phone": req.phone if req.phone is not None else existing_prof.get("phone", ""),
+        "gender": req.gender if req.gender is not None else existing_prof.get("gender", ""),
+        "city": req.city if req.city is not None else existing_prof.get("city", ""),
+        "state": req.state if req.state is not None else existing_prof.get("state", ""),
+        "pincode": req.pincode if req.pincode is not None else existing_prof.get("pincode", ""),
+        "picture": req.picture if req.picture is not None else existing_prof.get("picture") or user.get("picture"),
+        "skills": req.skills if req.skills is not None else existing_prof.get("skills", []),
+        "score": req.score if req.score is not None else existing_prof.get("score"),
+        "experience": req.experience if req.experience is not None else existing_prof.get("experience"),
+        "projects": req.projects if req.projects is not None else existing_prof.get("projects", []),
+        "education": req.education if req.education is not None else existing_prof.get("education"),
+        "resumeUploaded": req.resumeUploaded if req.resumeUploaded is not None else existing_prof.get("resumeUploaded", False),
+        "resumeFileName": req.resumeFileName if req.resumeFileName is not None else existing_prof.get("resumeFileName", "")
+    }
+    
+    preferences_data = {
+        "targetRole": req.targetRole if req.targetRole is not None else user.get("preferences", {}).get("targetRole", ""),
+        "techStack": req.techStack if req.techStack is not None else user.get("preferences", {}).get("techStack", ""),
+        "careerGoals": req.careerGoals if req.careerGoals is not None else user.get("preferences", {}).get("careerGoals", ""),
+        "workPreference": req.workPreference if req.workPreference is not None else user.get("preferences", {}).get("workPreference", "Remote"),
+        "experienceLevel": req.experienceLevel if req.experienceLevel is not None else user.get("preferences", {}).get("experienceLevel", "Fresher"),
+        "preferredCompanies": req.preferredCompanies if req.preferredCompanies is not None else user.get("preferences", {}).get("preferredCompanies", ""),
+        "learningFocus": req.learningFocus if req.learningFocus is not None else user.get("preferences", {}).get("learningFocus", [])
+    }
+    
+    try:
+        updated_user = update_user_profile(email, profile_data, preferences_data)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    logger.info("Profile updated successfully for user: %s", email)
+    return {
+        "success": True,
+        "message": "Profile updated successfully.",
+        "user": {
+            "id": updated_user.get("id"),
+            "email": updated_user.get("email"),
+            "name": updated_user.get("name"),
+            "profile": updated_user.get("profile", {}),
+            "preferences": updated_user.get("preferences", {})
+        }
+    }
 
 @router.post("/signup")
 async def register(req: SignupRequest):
@@ -129,6 +260,33 @@ async def reset_password_route(req: ResetPasswordRequest):
     
     return {"success": True, "message": "Password reset successfully."}
 
+class SetPasswordRequest(BaseModel):
+    new_password: str
+    confirm_password: str
+
+@router.post("/set-password")
+async def set_password_route(req: SetPasswordRequest, authorization: Optional[str] = Header(None)):
+    """Allow an authenticated user to set or update their password.
+    Useful for accounts originally created via OTP that never had a password.
+    """
+    user = get_current_user_from_header(authorization)
+    
+    if not req.new_password or len(req.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters.")
+    
+    if req.new_password != req.confirm_password:
+        raise HTTPException(status_code=400, detail="Passwords do not match.")
+    
+    email = user["email"]
+    for u in users_db:
+        if u.get("email", "").strip().lower() == email.strip().lower():
+            u["password"] = req.new_password
+            _save_users_to_disk()
+            logger.info("Password updated successfully for user: %s", email)
+            return {"success": True, "message": "Password set successfully. You can now log in with your email and password."}
+    
+    raise HTTPException(status_code=404, detail="User not found.")
+
 @router.post("/generate-otp")
 async def generate_otp_route(req: GenerateOTPRequest):
     logger.info(f"OTP generation requested for email: {req.email}, purpose: {req.purpose}")
@@ -138,18 +296,17 @@ async def generate_otp_route(req: GenerateOTPRequest):
         logger.warning(f"Invalid email format provided: {email}")
         raise HTTPException(status_code=400, detail="Invalid email format")
     
-    # 1. User lookup (Logging only, we still generate OTP for LOGIN if user doesn't exist)
     user_exists = bool(find_user_by_email(email))
     logger.info(f"User exists in database: {user_exists}")
     
     try:
         otp = otp_manager.generate_otp(email, req.purpose)
         if otp:
-            logger.info("OTP generated and stored successfully.")
+            logger.info("OTP generated and stored successfully in memory.")
         else:
             logger.warning("OTP generation returned None (Likely PASSWORD_RESET for non-existent user).")
     except ValueError as e:
-        logger.warning(f"OTP generation blocked: {str(e)}")
+        logger.warning(f"OTP generation blocked by rate limiter: {str(e)}")
         raise HTTPException(status_code=429, detail=str(e))
     except Exception as e:
         logger.error(f"Unexpected error during OTP generation: {traceback.format_exc()}")
@@ -165,7 +322,17 @@ async def generate_otp_route(req: GenerateOTPRequest):
         subject = "Reset Your Password"
         
     try:
-        logger.info(f"Initiating email delivery to {email} via SMTP...")
+        _email_user, _email_pass = get_email_credentials()
+        is_dev = is_development_mode()
+        
+        if (not _email_user or not _email_pass) and not is_dev:
+            logger.error("OTP email aborted: EMAIL_USER / EMAIL_PASS not configured in backend/.env for production")
+            raise HTTPException(
+                status_code=503,
+                detail="Email delivery is not configured on this server. Please contact support or configure SMTP in .env."
+            )
+
+        logger.info(f"Dispatching OTP notification for {email} (Mode: {'Development' if is_dev else 'Production'})...")
         success = send_notification_email(
             subject=subject,
             event_type="otp",
@@ -174,10 +341,14 @@ async def generate_otp_route(req: GenerateOTPRequest):
         
         if not success:
             logger.error("Email service returned failure status.")
-            raise HTTPException(status_code=500, detail="Failed to deliver OTP email. Please check SMTP configuration.")
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to send OTP email. Please check your SMTP configuration in backend/.env."
+            )
             
-        logger.info(f"OTP email successfully sent to {email}")
+        logger.info(f"OTP successfully processed for {email}")
         return {"success": True, "message": "OTP generated and sent."}
+        
     except HTTPException:
         raise
     except Exception as e:
@@ -211,7 +382,6 @@ async def verify_otp_route(req: VerifyOTPRequest):
         # Default LOGIN (Passwordless Auth)
         if not user:
             logger.info(f"User not found for {email}, initiating automatic registration.")
-            import uuid
             # Auto-create user with a random password since it's OTP auth
             user = create_user(
                 name=email.split("@")[0], 

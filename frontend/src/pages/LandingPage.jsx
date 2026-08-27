@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from '../components/landing/Navbar';
 import PrepriaHero from '../components/landing/PrepriaHero';
 import FeatureStrip from '../components/landing/FeatureStrip';
@@ -14,6 +14,16 @@ import PrepriaFooter from '../components/landing/PrepriaFooter';
 export default function LandingPage() {
   const [partnerModalOpen, setPartnerModalOpen] = useState(false);
 
+  useEffect(() => {
+    if (window.location.hash) {
+      const id = window.location.hash.substring(1);
+      const el = document.getElementById(id);
+      if (el) {
+        setTimeout(() => el.scrollIntoView({ behavior: 'smooth' }), 150);
+      }
+    }
+  }, []);
+
   const handleOpenPartnerModal = () => {
     setPartnerModalOpen(true);
   };
@@ -23,13 +33,13 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-950 text-[#111111] dark:text-white font-manrope selection:bg-[#FF6B00] selection:text-white relative">
+    <div className="min-h-screen flex flex-col w-full bg-white dark:bg-slate-950 text-[#111111] dark:text-white font-manrope selection:bg-[#FF6B00] selection:text-white relative">
       
       {/* Navigation Header */}
       <Navbar onOpenPartnerModal={handleOpenPartnerModal} />
 
       {/* Main Landing Flow */}
-      <main>
+      <main className="flex-1 w-full">
         {/* Visually Striking Hero with Live Dashboard Preview */}
         <PrepriaHero />
 

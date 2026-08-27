@@ -174,7 +174,7 @@ export default function WhyUs() {
             </div>
             <div className="p-5">
               <p className="text-sm text-gray-700 dark:text-gray-300 font-medium mb-4">
-                Hi! Welcome to AI Career Platform. Need help preparing for your next interview?
+                Hi! Welcome to PREPRIA. Need help preparing for your next interview?
               </p>
               <button onClick={() => navigate('/mock-interview')} className="w-full py-2 bg-primary/10 hover:bg-primary/20 text-primary font-bold text-sm rounded-xl transition-colors flex justify-center items-center gap-2">
                 Need interview help?

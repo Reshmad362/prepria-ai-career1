@@ -25,6 +25,7 @@ export default function Signup() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [passwordTouched, setPasswordTouched] = useState(false);
 
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -56,6 +57,15 @@ export default function Signup() {
   };
 
   const isPasswordValid = validatePassword(formData.password);
+
+  // Password requirement breakdown for inline checklist
+  const pwdRules = [
+    { label: 'At least 8 characters',          ok: formData.password.length >= 8 },
+    { label: 'One uppercase letter (A–Z)',      ok: /[A-Z]/.test(formData.password) },
+    { label: 'One lowercase letter (a–z)',      ok: /[a-z]/.test(formData.password) },
+    { label: 'One number (0–9)',                ok: /[0-9]/.test(formData.password) },
+    { label: 'One special character (!@#$%^&*)', ok: /[!@#$%^&*]/.test(formData.password) },
+  ];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -130,7 +140,15 @@ export default function Signup() {
     }
   };
 
-  const isFormInvalid = !formData.email || !formData.name || !isPasswordValid || formData.password !== formData.confirmPassword || !formData.securityAnswer;
+  // Button is enabled when all required *fields* are filled and passwords match.
+  // Full password-strength validation still runs on submit and shows an error message.
+  const isFormInvalid =
+    !formData.email ||
+    !formData.name ||
+    !formData.password ||
+    !formData.confirmPassword ||
+    formData.password !== formData.confirmPassword ||
+    !formData.securityAnswer;
 
   return (
     <div className="min-h-screen bg-[#0B0B0D] text-white flex flex-col lg:flex-row relative overflow-hidden font-inter selection:bg-[#FF6B3D] selection:text-white">
@@ -272,6 +290,7 @@ export default function Signup() {
                   placeholder="••••••••"
                   value={formData.password}
                   onChange={(e) => setFormData({...formData, password: e.target.value})}
+                  onFocus={() => setPasswordTouched(true)}
                   disabled={loading}
                 />
                 <button
@@ -284,7 +303,7 @@ export default function Signup() {
                 </button>
               </div>
 
-              {/* Strength Indicator */}
+              {/* Strength bar */}
               {formData.password && (
                 <div className="mt-2 space-y-1.5">
                   <div className="flex items-center justify-between text-xs font-medium text-[#B8B8B8]">
@@ -301,6 +320,20 @@ export default function Signup() {
                     </div>
                   </div>
                 </div>
+              )}
+
+              {/* Per-rule checklist — only shown after the user has touched the field */}
+              {passwordTouched && formData.password && (
+                <ul className="mt-2 space-y-1">
+                  {pwdRules.map((rule) => (
+                    <li key={rule.label} className={`flex items-center gap-1.5 text-[11px] font-medium ${
+                      rule.ok ? 'text-emerald-400' : 'text-[#B8B8B8]/60'
+                    }`}>
+                      <span className="shrink-0">{rule.ok ? '✓' : '○'}</span>
+                      {rule.label}
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
 

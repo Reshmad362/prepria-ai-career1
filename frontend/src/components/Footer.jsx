@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Instagram, Github, Linkedin, Youtube, Send, Mail, Phone } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Instagram, Github, Linkedin, Youtube, Send, Mail, Phone, Building2, ArrowRight, CheckCircle2, Sparkles } from 'lucide-react';
 
-export default function Footer() {
+export default function Footer({ onOpenPartnerModal }) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [formData, setFormData] = useState({ name: '', phone: '', email: '', message: '' });
   const [submitted, setSubmitted] = useState(false);
 
@@ -10,216 +12,318 @@ export default function Footer() {
     e.preventDefault();
     setSubmitted(true);
     setFormData({ name: '', phone: '', email: '', message: '' });
-    setTimeout(() => setSubmitted(false), 4000);
+    setTimeout(() => setSubmitted(false), 5000);
   };
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const topJobs = [
-    "Finance & Accounting", "Product Management", "Executive Roles", 
-    "AI & Data Science", "Cloud Computing", "Cyber Security", "DevOps", "Electrical Engineering"
-  ];
-
-  const trending = [
-    "1:1 Coding Sessions", "LinkedIn Review", "AI Mock Interview", 
-    "Resume Review", "Interview Preparation", "Fast Track Courses", "Video Courses"
-  ];
-
   const quickLinks = [
-    { name: "Top Jobs", path: "#" },
-    { name: "Trending", path: "#" },
-    { name: "Resources", path: "/resources" },
-    { name: "Why Us", path: "/why-us" },
-    { name: "Contact", path: "/contact" },
-    { name: "Blogs", path: "#" },
-    { name: "Testimonials", path: "#" }
+    { name: 'Features', path: '#features' },
+    { name: 'How It Works', path: '#how-it-works' },
+    { name: 'Modules', path: '#modules' },
+    { name: 'Why PREPRIA', path: '/why-us' },
+    { name: 'Resources & Guides', path: '/resources' },
+    { name: 'Contact Us', path: '/contact' },
   ];
 
-  const solutions = [
-    "Students", "Freshers", "Job Seekers", "Educational Institutions"
+  const platformModules = [
+    { name: 'ATS Resume Intelligence', path: '/resume-upload' },
+    { name: 'AI Mock Interviews', path: '/role-interviews' },
+    { name: 'Career Roadmaps', path: '/career-roadmap' },
+    { name: 'Courses & Certification', path: '/my-courses' },
+    { name: 'Job Recommendations', path: '/jobs' },
+    { name: 'Progress Analytics', path: '/progress' },
   ];
+
+  const handleLinkClick = (path, e) => {
+    if (path.startsWith('#')) {
+      e.preventDefault();
+      const targetId = path.substring(1);
+      if (location.pathname === '/') {
+        const el = document.getElementById(targetId);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth' });
+        }
+      } else {
+        navigate(`/${path}`);
+      }
+    }
+  };
 
   return (
-    <footer className="bg-slate-900 text-white pt-16 pb-8 border-t border-slate-800 font-sans mt-auto">
-      <div className="max-w-7xl mx-auto px-6 lg:px-8">
+    <footer className="w-full bg-[#0B0D10] text-white border-t border-white/[0.08] pt-16 pb-12 font-manrope mt-auto relative shrink-0 transition-colors selection:bg-[#FF6B00] selection:text-white">
+      
+      {/* Subtle Ambient Background Accents */}
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#FF6B00]/[0.03] rounded-full blur-[140px] pointer-events-none -z-10 overflow-hidden" />
+      <div className="absolute bottom-10 right-10 w-96 h-96 bg-orange-500/[0.02] rounded-full blur-[120px] pointer-events-none -z-10 overflow-hidden" />
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         
-        {/* SECTION 1: Top Jobs */}
-        <div className="mb-10">
-          <h3 className="text-lg font-bold mb-4 text-purple-400">Top Jobs</h3>
-          <div className="flex flex-wrap items-center gap-4 text-sm text-slate-300">
-            {topJobs.map((job, idx) => (
-              <React.Fragment key={idx}>
-                <a href="#" className="hover:text-purple-400 transition-colors">{job}</a>
-                {idx !== topJobs.length - 1 && <span className="text-slate-700 hidden sm:inline">|</span>}
-              </React.Fragment>
-            ))}
-          </div>
-        </div>
-
-        {/* SECTION 2: Trending */}
-        <div className="mb-12 pb-12 border-b border-slate-800">
-          <h3 className="text-lg font-bold mb-4 text-purple-400">Trending</h3>
-          <div className="flex flex-wrap items-center gap-4 text-sm text-slate-300">
-            {trending.map((item, idx) => (
-              <React.Fragment key={idx}>
-                <a href="#" className="hover:text-purple-400 transition-colors">{item}</a>
-                {idx !== trending.length - 1 && <span className="text-slate-700 hidden sm:inline">|</span>}
-              </React.Fragment>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-12">
+        {/* Main Grid: 12 Columns */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8 pb-12 w-full">
           
-          {/* LEFT SIDE: Brand & Links */}
-          <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
+          {/* LEFT SIDE: Brand & Navigation Columns (7 cols) */}
+          <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-6">
             
-            {/* SECTION 3: Brand Area */}
-            <div className="col-span-1 sm:col-span-2 md:col-span-1 flex flex-col gap-6">
-              <div>
-                <h2 className="text-2xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-400">
-                  AI CareerPlatform
-                </h2>
-                <p className="text-sm text-slate-400 mt-4">
-                  Empowering your career with AI-driven insights, mock interviews, and personalized role suggestions.
-                </p>
-              </div>
-              <div className="flex items-center gap-4">
-                <a href="#" className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 hover:bg-purple-600 hover:text-white transition-all"><Instagram className="w-5 h-5" /></a>
-                <a href="#" className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 hover:bg-purple-600 hover:text-white transition-all"><Github className="w-5 h-5" /></a>
-                <a href="#" className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 hover:bg-purple-600 hover:text-white transition-all"><Linkedin className="w-5 h-5" /></a>
-                <a href="#" className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 hover:bg-purple-600 hover:text-white transition-all"><Youtube className="w-5 h-5" /></a>
+            {/* 1. Brand & Social Column */}
+            <div className="space-y-5 sm:col-span-1">
+              <Link to="/" className="inline-flex items-center gap-3 group">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF6B00] to-[#E05D00] flex items-center justify-center text-white font-extrabold text-xl shadow-md shadow-[#FF6B00]/25 group-hover:scale-105 transition-transform">
+                  P
+                </div>
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-manrope text-xl font-extrabold tracking-tight text-white">PREPRIA</span>
+                    <span className="w-2 h-2 rounded-full bg-[#FF6B00] animate-pulse" />
+                  </div>
+                  <span className="text-[10px] uppercase tracking-widest text-[#FF6B00] font-extrabold">Career Intelligence</span>
+                </div>
+              </Link>
+
+              <p className="text-xs sm:text-sm text-gray-400 leading-relaxed font-normal">
+                PREPRIA is an intelligent career acceleration platform helping students prepare smarter, perform better, and progress faster.
+              </p>
+
+              {/* Social Buttons */}
+              <div className="flex items-center gap-2.5 pt-1">
+                <a 
+                  href="https://linkedin.com" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  aria-label="LinkedIn"
+                  className="w-9 h-9 rounded-xl bg-white/[0.06] hover:bg-[#FF6B00] text-gray-400 hover:text-white flex items-center justify-center transition-all duration-200"
+                >
+                  <Linkedin className="w-4 h-4" />
+                </a>
+                <a 
+                  href="https://github.com" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  aria-label="GitHub"
+                  className="w-9 h-9 rounded-xl bg-white/[0.06] hover:bg-[#FF6B00] text-gray-400 hover:text-white flex items-center justify-center transition-all duration-200"
+                >
+                  <Github className="w-4 h-4" />
+                </a>
+                <a 
+                  href="https://instagram.com" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  aria-label="Instagram"
+                  className="w-9 h-9 rounded-xl bg-white/[0.06] hover:bg-[#FF6B00] text-gray-400 hover:text-white flex items-center justify-center transition-all duration-200"
+                >
+                  <Instagram className="w-4 h-4" />
+                </a>
+                <a 
+                  href="https://youtube.com" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  aria-label="YouTube"
+                  className="w-9 h-9 rounded-xl bg-white/[0.06] hover:bg-[#FF6B00] text-gray-400 hover:text-white flex items-center justify-center transition-all duration-200"
+                >
+                  <Youtube className="w-4 h-4" />
+                </a>
               </div>
             </div>
 
-            {/* SECTION 4: Quick Links */}
+            {/* 2. Quick Links Column */}
             <div>
-              <h3 className="text-lg font-bold text-white mb-6">Quick Links</h3>
-              <ul className="space-y-3 text-sm text-slate-400">
-                {quickLinks.map((link, idx) => (
+              <h4 className="text-xs font-bold uppercase tracking-wider text-white mb-4 font-manrope">
+                Quick Links
+              </h4>
+              <ul className="space-y-2.5 text-xs sm:text-sm text-gray-400">
+                {quickLinks.map((item, idx) => (
                   <li key={idx}>
-                    <Link to={link.path} className="hover:text-purple-400 transition-colors flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-purple-500/50"></span>
-                      {link.name}
-                    </Link>
+                    {item.path.startsWith('#') ? (
+                      <a 
+                        href={item.path}
+                        onClick={(e) => handleLinkClick(item.path, e)} 
+                        className="hover:text-[#FF6B00] transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <span className="w-1 h-1 rounded-full bg-[#FF6B00]/40" />
+                        {item.name}
+                      </a>
+                    ) : (
+                      <Link 
+                        to={item.path} 
+                        className="hover:text-[#FF6B00] transition-colors inline-flex items-center gap-1.5"
+                      >
+                        <span className="w-1 h-1 rounded-full bg-[#FF6B00]/40" />
+                        {item.name}
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>
             </div>
 
-            {/* SECTION 5: Solutions & SECTION 6: Support */}
-            <div className="flex flex-col gap-8">
+            {/* 3. Platform & Support Column */}
+            <div className="space-y-6">
               <div>
-                <h3 className="text-lg font-bold text-white mb-6">Solutions</h3>
-                <ul className="space-y-3 text-sm text-slate-400">
-                  {solutions.map((item, idx) => (
+                <h4 className="text-xs font-bold uppercase tracking-wider text-white mb-4 font-manrope">
+                  Platform
+                </h4>
+                <ul className="space-y-2.5 text-xs sm:text-sm text-gray-400">
+                  {platformModules.map((item, idx) => (
                     <li key={idx}>
-                      <a href="#" className="hover:text-purple-400 transition-colors flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-purple-500/50"></span>
-                        {item}
-                      </a>
+                      <Link 
+                        to={item.path} 
+                        className="hover:text-[#FF6B00] transition-colors inline-flex items-center gap-1.5"
+                      >
+                        <span className="w-1 h-1 rounded-full bg-[#FF6B00]/40" />
+                        {item.name}
+                      </Link>
                     </li>
                   ))}
                 </ul>
               </div>
-              
-              <div>
-                <h3 className="text-lg font-bold text-white mb-6">Support</h3>
-                <div className="space-y-4 text-sm text-slate-400">
-                  <a href="mailto:projectteam.1522@gmail.com" className="hover:text-purple-400 transition-colors flex items-center gap-3 cursor-pointer hover:underline">
-                    <Mail className="w-4 h-4 text-purple-400" /> projectteam.1522@gmail.com
-                  </a>
-                  <a href="tel:+916360012760" className="hover:text-purple-400 transition-colors flex items-center gap-3 cursor-pointer hover:underline">
-                    <Phone className="w-4 h-4 text-purple-400" /> 6360012760
-                  </a>
-                  <a href="tel:+916361288806" className="hover:text-purple-400 transition-colors flex items-center gap-3 cursor-pointer hover:underline">
-                    <Phone className="w-4 h-4 text-purple-400" /> 6361288806
-                  </a>
+            </div>
+
+          </div>
+
+          {/* RIGHT SIDE: Campus/College Callback Form (5 cols) */}
+          <div className="lg:col-span-5 bg-white/[0.03] border border-white/[0.08] rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl relative overflow-hidden backdrop-blur-sm">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF6B00]/[0.08] rounded-full blur-2xl pointer-events-none" />
+
+            <div className="space-y-1.5">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-[#FF6B00] text-xs font-bold uppercase tracking-wider">
+                <Building2 className="w-3.5 h-3.5" />
+                <span>Colleges &amp; Universities</span>
+              </div>
+              <h3 className="text-lg sm:text-xl font-extrabold text-white tracking-tight font-manrope">
+                Partner with PREPRIA
+              </h3>
+              <p className="text-xs text-gray-400 leading-relaxed font-normal">
+                Empower your students with AI-driven mock interviews, ATS resume diagnostics, and real-time placement readiness tracking.
+              </p>
+            </div>
+
+            {submitted ? (
+              <div className="p-5 rounded-2xl bg-emerald-950/40 border border-emerald-800/40 text-emerald-400 text-xs sm:text-sm flex items-start gap-3 animate-fadeIn">
+                <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-400 mt-0.5" />
+                <div>
+                  <p className="font-bold text-white mb-0.5">Callback Requested Successfully!</p>
+                  <p className="text-emerald-300/80">Our institutional partnerships team will connect with you within 24 business hours.</p>
                 </div>
               </div>
-            </div>
-
-          </div>
-
-          {/* RIGHT SIDE: SECTION 7: Request a Call Card */}
-          <div className="lg:col-span-5">
-            <div className="bg-slate-800/50 border border-slate-700 p-8 rounded-3xl relative overflow-hidden">
-              {/* Decorative blob */}
-              <div className="absolute top-0 right-0 -mr-16 -mt-16 w-32 h-32 bg-purple-500/20 rounded-full blur-3xl pointer-events-none"></div>
-
-              <h3 className="text-xl font-bold text-white mb-2">Seeking personalized guidance?</h3>
-              <h4 className="text-lg font-bold text-purple-400 mb-2">Request a call from our team</h4>
-              <p className="text-sm text-slate-400 mb-6">
-                Get help with mock interviews, resume analysis, role suggestions, and career preparation.
-              </p>
-
-              {submitted && (
-                <div className="mb-6 p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-green-400 text-sm font-medium flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
-                  Callback request submitted successfully
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1">
+                      Full Name *
+                    </label>
+                    <input 
+                      type="text" 
+                      name="name" 
+                      required 
+                      value={formData.name}
+                      onChange={handleChange}
+                      placeholder="e.g. Dr. Ramesh Kumar"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.05] border border-white/[0.1] text-white text-xs placeholder-gray-500 focus:outline-none focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00] transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1">
+                      Phone Number *
+                    </label>
+                    <input 
+                      type="tel" 
+                      name="phone" 
+                      required 
+                      value={formData.phone}
+                      onChange={handleChange}
+                      placeholder="e.g. +91 98765 43210"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.05] border border-white/[0.1] text-white text-xs placeholder-gray-500 focus:outline-none focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00] transition-all"
+                    />
+                  </div>
                 </div>
-              )}
 
-              <form onSubmit={handleSubmit} className="space-y-4 relative z-10">
-                <input 
-                  type="text" 
-                  name="name"
-                  required
-                  placeholder="Full name" 
-                  value={formData.name}
-                  onChange={handleChange}
-                  className="w-full bg-slate-900/80 border border-slate-700 text-white text-sm rounded-xl px-4 py-3 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
-                />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <input 
-                    type="tel" 
-                    name="phone"
-                    required
-                    placeholder="Phone number" 
-                    value={formData.phone}
-                    onChange={handleChange}
-                    className="w-full bg-slate-900/80 border border-slate-700 text-white text-sm rounded-xl px-4 py-3 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
-                  />
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1">
+                    Institution / Work Email *
+                  </label>
                   <input 
                     type="email" 
-                    name="email"
-                    required
-                    placeholder="Email" 
+                    name="email" 
+                    required 
                     value={formData.email}
                     onChange={handleChange}
-                    className="w-full bg-slate-900/80 border border-slate-700 text-white text-sm rounded-xl px-4 py-3 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
+                    placeholder="e.g. placement@university.edu.in"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white/[0.05] border border-white/[0.1] text-white text-xs placeholder-gray-500 focus:outline-none focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00] transition-all"
                   />
                 </div>
-                <textarea 
-                  name="message"
-                  required
-                  placeholder="Message" 
-                  value={formData.message}
-                  onChange={handleChange}
-                  rows="3"
-                  className="w-full bg-slate-900/80 border border-slate-700 text-white text-sm rounded-xl px-4 py-3 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors resize-none"
-                ></textarea>
-                <button 
-                  type="submit" 
-                  className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-xl transition-colors flex justify-center items-center gap-2 shadow-lg shadow-purple-600/20"
-                >
-                  <Send className="w-4 h-4" /> Request Callback
-                </button>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-gray-400 mb-1">
+                    Institution Name &amp; Message
+                  </label>
+                  <textarea 
+                    name="message" 
+                    rows="2"
+                    value={formData.message}
+                    onChange={handleChange}
+                    placeholder="Tell us about your campus placement requirements..."
+                    className="w-full px-3.5 py-2 rounded-xl bg-white/[0.05] border border-white/[0.1] text-white text-xs placeholder-gray-500 focus:outline-none focus:border-[#FF6B00] focus:ring-1 focus:ring-[#FF6B00] transition-all resize-none"
+                  />
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                  <button 
+                    type="submit" 
+                    className="flex-1 bg-[#FF6B00] hover:bg-[#E05D00] text-white font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-[#FF6B00]/25 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
+                  >
+                    <span>Request Institutional Callback</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+
+                  {onOpenPartnerModal && (
+                    <button
+                      type="button"
+                      onClick={onOpenPartnerModal}
+                      className="px-3.5 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.12] text-white text-xs font-semibold transition-colors cursor-pointer"
+                    >
+                      Institutional Deck
+                    </button>
+                  )}
+                </div>
               </form>
+            )}
+
+            {/* Direct Contact Row */}
+            <div className="pt-3 border-t border-white/[0.08] flex flex-wrap items-center justify-between gap-3 text-[11px] text-gray-400 font-medium">
+              <span className="flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-[#FF6B00]" />
+                <a href="mailto:partnerships@prepria.com" className="hover:text-white transition-colors">
+                  partnerships@prepria.com
+                </a>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5 text-[#FF6B00]" />
+                <a href="tel:+918000000000" className="hover:text-white transition-colors">
+                  +91 (800) PREPRIA
+                </a>
+              </span>
             </div>
+
+          </div>
+
+        </div>
+
+        {/* BOTTOM ROW: Copyright & Legal */}
+        <div className="pt-8 border-t border-white/[0.08] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-500 font-medium">
+          <div className="flex items-center gap-2">
+            <span>© {new Date().getFullYear()} PREPRIA. All rights reserved.</span>
+          </div>
+
+          <div className="flex items-center gap-6 text-gray-400">
+            <Link to="/why-us" className="hover:text-[#FF6B00] transition-colors">Why PREPRIA</Link>
+            <Link to="/resources" className="hover:text-[#FF6B00] transition-colors">Resources</Link>
+            <Link to="/contact" className="hover:text-[#FF6B00] transition-colors">Privacy &amp; Terms</Link>
           </div>
         </div>
 
-        {/* COPYRIGHT */}
-        <div className="pt-8 border-t border-slate-800 text-center flex flex-col md:flex-row items-center justify-between gap-4 text-slate-500 text-sm">
-          <p>© 2026 AI CareerPlatform. All rights reserved.</p>
-          <div className="flex gap-6">
-            <a href="#" className="hover:text-purple-400 transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-purple-400 transition-colors">Terms of Service</a>
-          </div>
-        </div>
       </div>
     </footer>
   );

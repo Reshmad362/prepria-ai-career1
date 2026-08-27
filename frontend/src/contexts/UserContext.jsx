@@ -1,4 +1,5 @@
 import React, { createContext, useState, useEffect } from 'react';
+import { calculateProfileCompletion } from '../utils/profileCompletion';
 
 export const UserContext = createContext();
 
@@ -10,73 +11,52 @@ export const UserProvider = ({ children }) => {
     targetRole: '',
     techStack: '',
     careerGoals: '',
-    workPreference: 'Remote'
+    workPreference: 'Remote',
+    experienceLevel: 'Fresher'
   });
   const [profileCompletion, setProfileCompletion] = useState(0);
   const [missingFields, setMissingFields] = useState([]);
-
-  const calculateProfileCompletion = (prof, prefs, activeUserEmail) => {
-    let score = 0;
-    let missing = [];
-
-    if (!prof) return { percentage: 0, missing: ['Profile Data'] };
-
-    if (prof.name && prof.name.trim() !== '' && prof.name !== 'Not found') {
-        score += 20;
-    } else {
-        missing.push("Full Name");
-    }
-
-    if (activeUserEmail || prof.email) {
-        score += 10;
-    } else {
-        missing.push("Email");
-    }
-
-    if (prof.phone && prof.phone.trim() !== '' && prof.phone !== 'Not found') {
-        score += 20;
-    } else {
-        missing.push("Phone Number");
-    }
-
-    if (prof.gender && prof.gender !== 'Select Gender' && prof.gender !== '') {
-        score += 10;
-    } else {
-        missing.push("Gender");
-    }
-
-    if ((prefs && prefs.targetRole && prefs.targetRole.trim() !== '') || (prof.targetRole && prof.targetRole.trim() !== '')) {
-        score += 20;
-    } else {
-        missing.push("Target Role");
-    }
-
-    if (prof.resumeUploaded || prof.score !== undefined || (prof.skills && prof.skills.length > 0)) {
-        score += 20;
-    } else {
-        missing.push("Resume Upload");
-    }
-
-    // PHASE 7 — DEBUG LOGS
-    console.log("Loaded profile:", prof);
-    console.log("Completion:", score);
-
-    return { percentage: Math.min(100, score), missing };
-  };
-
+  const [completionData, setCompletionData] = useState({
+    percentage: 0,
+    completed: 0,
+    total: 10,
+    remaining: 10,
+    missing: [],
+    missingSections: [],
+    completedSections: [],
+    sections: [],
+    status: "Getting Started",
+    color: "text-amber-500",
+    barColor: "bg-amber-500",
+    resumeStatus: { isUploaded: false, isAnalyzed: false, score: null, fileName: null }
+  });
   const [isProfileLoaded, setIsProfileLoaded] = useState(false);
 
-  // Recalculate whenever profile or preferences change
+  // Recalculate whenever profile, preferences, or user change
   useEffect(() => {
-    if (profile) {
-      const { percentage, missing } = calculateProfileCompletion(profile, preferences, user?.email);
-      setProfileCompletion(percentage);
-      setMissingFields(missing);
+    if (profile || preferences || user) {
+      const result = calculateProfileCompletion(profile, preferences, user);
+      setProfileCompletion(result.percentage);
+      setMissingFields(result.missing);
+      setCompletionData(result);
       setIsProfileLoaded(true);
     } else {
       setProfileCompletion(0);
       setMissingFields([]);
-      // Do not set isProfileLoaded to true here if we haven't loaded it yet
+      setCompletionData({
+        percentage: 0,
+        completed: 0,
+        total: 10,
+        remaining: 10,
+        missing: [],
+        missingSections: [],
+        completedSections: [],
+        sections: [],
+        status: "Getting Started",
+        color: "text-amber-500",
+        barColor: "bg-amber-500",
+        resumeStatus: { isUploaded: false, isAnalyzed: false, score: null, fileName: null }
+      });
     }
   }, [profile, preferences, user]);
 
@@ -90,10 +70,31 @@ export const UserProvider = ({ children }) => {
       const savedProfile = localStorage.getItem(`profile_${activeEmail}`);
       const savedPrefs = localStorage.getItem(`preferences_${activeEmail}`);
       const savedHistory = localStorage.getItem(`scoreHistory_${activeEmail}`);
+      const savedAts = localStorage.getItem(`atsData_${activeEmail}`);
       
-      if (savedProfile) setProfile(JSON.parse(savedProfile));
+      let baseProfile = savedProfile ? JSON.parse(savedProfile) : {};
+      if (savedAts) {
+        try {
+          const parsedAts = JSON.parse(savedAts);
+          if (baseProfile.score === undefined || baseProfile.score === null) {
+            baseProfile = {
+              ...baseProfile,
+              score: parsedAts.score,
+              skills: parsedAts.skills || [],
+              experience: parsedAts.experience || '',
+              projects: parsedAts.projects || [],
+              education: parsedAts.education || '',
+              resumeUploaded: true,
+              resumeFileName: parsedAts.fileName || 'Resume.pdf'
+            };
+          }
+        } catch(e) {}
+      }
+
+      if (Object.keys(baseProfile).length > 0) setProfile(baseProfile);
       if (savedPrefs) setPreferences(JSON.parse(savedPrefs));
       if (savedHistory) setScoreHistory(JSON.parse(savedHistory));
+      setIsProfileLoaded(true);
     }
     
     if (token) {
@@ -102,39 +103,75 @@ export const UserProvider = ({ children }) => {
       fetch(`${API_URL}/auth/me`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error("Unauthorized");
+        return res.json();
+      })
       .then(data => {
         if (data && data.user) {
           const email = data.user.email;
           setUser(data.user);
+          localStorage.setItem("user", JSON.stringify(data.user));
           localStorage.setItem("activeUser", email);
           
           const savedProfile = localStorage.getItem(`profile_${email}`);
           const savedPrefs = localStorage.getItem(`preferences_${email}`);
           const savedHistory = localStorage.getItem(`scoreHistory_${email}`);
+          const savedAts = localStorage.getItem(`atsData_${email}`);
 
-          if (savedProfile) {
-            setProfile(JSON.parse(savedProfile));
-          } else if (data.user.profile) {
-            setProfile(data.user.profile);
-            localStorage.setItem(`profile_${email}`, JSON.stringify(data.user.profile));
+          let parsedSaved = savedProfile ? JSON.parse(savedProfile) : {};
+          let parsedAts = savedAts ? JSON.parse(savedAts) : null;
+          let backendProfile = data.user.profile || {};
+
+          // Merge: backend is ground truth for non-empty fields, preserves local non-empty fields
+          const mergedProfile = { ...parsedSaved };
+          Object.keys(backendProfile).forEach(key => {
+            const val = backendProfile[key];
+            if (val !== "" && val !== null && val !== undefined) {
+              mergedProfile[key] = val;
+            }
+          });
+
+          // ATS resume data fallback if skills not populated
+          if (parsedAts && (!mergedProfile.skills || mergedProfile.skills.length === 0)) {
+            mergedProfile.skills = parsedAts.skills || [];
+            if (mergedProfile.score === undefined || mergedProfile.score === null) mergedProfile.score = parsedAts.score;
+            if (!mergedProfile.experience) mergedProfile.experience = parsedAts.experience || '';
+            if (!mergedProfile.projects || mergedProfile.projects.length === 0) mergedProfile.projects = parsedAts.projects || [];
+            if (!mergedProfile.education) mergedProfile.education = parsedAts.education || '';
+            mergedProfile.resumeUploaded = true;
+            mergedProfile.resumeFileName = parsedAts.fileName || 'Resume.pdf';
           }
 
-          if (savedHistory) {
-             setScoreHistory(JSON.parse(savedHistory));
-          } else if (data.user.scoreHistory) {
+          setProfile(mergedProfile);
+          localStorage.setItem(`profile_${email}`, JSON.stringify(mergedProfile));
+
+          if (data.user.scoreHistory && data.user.scoreHistory.length > 0) {
              setScoreHistory(data.user.scoreHistory);
              localStorage.setItem(`scoreHistory_${email}`, JSON.stringify(data.user.scoreHistory));
+          } else if (savedHistory) {
+             setScoreHistory(JSON.parse(savedHistory));
           }
           
-          if (savedPrefs) {
-             setPreferences(JSON.parse(savedPrefs));
-          } else if (data.user.preferences) {
-             setPreferences(data.user.preferences);
-             localStorage.setItem(`preferences_${email}`, JSON.stringify(data.user.preferences));
-          } else {
-             setPreferences({ targetRole: '', techStack: '', careerGoals: '', workPreference: 'Remote' });
-          }
+          const backendPrefs = data.user.preferences || {};
+          let mergedPrefs = savedPrefs ? JSON.parse(savedPrefs) : {
+            targetRole: '',
+            techStack: '',
+            careerGoals: '',
+            workPreference: 'Remote',
+            experienceLevel: 'Fresher'
+          };
+
+          Object.keys(backendPrefs).forEach(k => {
+            const val = backendPrefs[k];
+            if (val !== "" && val !== null && val !== undefined) {
+              mergedPrefs[k] = val;
+            }
+          });
+
+          setPreferences(mergedPrefs);
+          localStorage.setItem(`preferences_${email}`, JSON.stringify(mergedPrefs));
+          setIsProfileLoaded(true);
         }
       })
       .catch(err => {
@@ -169,6 +206,7 @@ export const UserProvider = ({ children }) => {
             } else if (parsedUser.preferences) {
                setPreferences(parsedUser.preferences);
             }
+            setIsProfileLoaded(true);
           } catch(e) {}
         }
       });
@@ -195,6 +233,7 @@ export const UserProvider = ({ children }) => {
         if (savedPrefs) setPreferences(JSON.parse(savedPrefs));
         else if (parsedUser.preferences) setPreferences(parsedUser.preferences);
 
+        setIsProfileLoaded(true);
       } catch (err) {
         console.error("Failed to parse user from local storage", err);
         clearProfile();
@@ -212,7 +251,7 @@ export const UserProvider = ({ children }) => {
     setUser(updatedUser);
     localStorage.setItem("user", JSON.stringify(updatedUser));
 
-    // Phase 2: Use user-specific storage keys
+    // Use user-specific storage keys
     if (key === 'profile') {
       localStorage.setItem(`profile_${user.email}`, JSON.stringify(data));
     } else if (key === 'preferences') {
@@ -225,7 +264,7 @@ export const UserProvider = ({ children }) => {
       localStorage.setItem(`progress_${user.email}`, JSON.stringify(data));
     }
 
-    // Also sync to global users array for demo mode persistence
+    // Sync to global users array for persistence
     const users = JSON.parse(localStorage.getItem("users")) || [];
     const updatedUsers = users.map(u => {
       if (u.email === user.email) {
@@ -240,27 +279,56 @@ export const UserProvider = ({ children }) => {
     const updated = { ...preferences, ...newPrefs };
     setPreferences(updated);
     saveToUser('preferences', updated);
+
+    // Asynchronously sync to backend if authenticated
+    const token = localStorage.getItem('token');
+    const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+    if (token) {
+      fetch(`${API_URL}/auth/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(newPrefs)
+      }).catch(err => console.warn("Background preference sync:", err));
+    }
   };
 
-  const updateProfile = (atsData) => {
-    const existingProfile = profile || JSON.parse(localStorage.getItem(`profile_${user?.email}`)) || {};
+  const updateProfile = (profileData) => {
+    const email = user?.email || localStorage.getItem("activeUser");
+    const existingProfile = profile || (email ? JSON.parse(localStorage.getItem(`profile_${email}`)) : {}) || {};
     const newProfile = {
       ...existingProfile,
-      ...atsData,
+      ...profileData,
       lastUpdated: new Date().toISOString()
     };
     
     setProfile(newProfile);
     saveToUser('profile', newProfile);
 
-    if (atsData.score !== undefined) {
+    if (profileData.score !== undefined && profileData.score !== null) {
       const historyEntry = {
         date: new Date().toISOString(),
-        score: atsData.score
+        score: profileData.score
       };
       const newHistory = [...scoreHistory, historyEntry];
       setScoreHistory(newHistory);
       saveToUser('scoreHistory', newHistory);
+    }
+
+    // Asynchronously sync to backend if authenticated
+    const token = localStorage.getItem('token');
+    const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+    if (token) {
+      fetch(`${API_URL}/auth/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(profileData)
+      }).catch(err => console.warn("Background profile sync:", err));
     }
   };
 
@@ -268,19 +336,34 @@ export const UserProvider = ({ children }) => {
     setUser(null);
     setProfile(null);
     setScoreHistory([]);
-    setPreferences({ targetRole: '', techStack: '', careerGoals: '', workPreference: 'Remote' });
+    setPreferences({ targetRole: '', techStack: '', careerGoals: '', workPreference: 'Remote', experienceLevel: 'Fresher' });
     setProfileCompletion(0);
     setMissingFields([]);
+    setCompletionData({
+      percentage: 0,
+      completed: 0,
+      total: 10,
+      remaining: 10,
+      missing: [],
+      missingSections: [],
+      completedSections: [],
+      sections: [],
+      status: "Getting Started",
+      color: "text-amber-500",
+      barColor: "bg-amber-500",
+      resumeStatus: { isUploaded: false, isAnalyzed: false, score: null, fileName: null }
+    });
+    setIsProfileLoaded(false);
     
     // Only clear session identifiers, protecting profile_* scoped storage
     localStorage.removeItem("token");
     localStorage.removeItem("activeUser");
     localStorage.removeItem("user");
     localStorage.removeItem("currentUser");
+    localStorage.removeItem("isDemo");
   };
 
   const setUserContext = (userData) => {
-    // This is called from Login, so it should receive the full user object
     setUser(userData);
     localStorage.setItem("user", JSON.stringify(userData));
     localStorage.setItem("activeUser", userData.email);
@@ -290,29 +373,54 @@ export const UserProvider = ({ children }) => {
     const savedPrefs = localStorage.getItem(`preferences_${activeEmail}`);
     const savedHistory = localStorage.getItem(`scoreHistory_${activeEmail}`);
 
-    if (savedProfile) {
-      setProfile(JSON.parse(savedProfile));
-    } else {
-      setProfile(userData.profile || null);
-    }
+    let currentProf = savedProfile ? JSON.parse(savedProfile) : {};
+    let backendProf = userData.profile || {};
+    Object.keys(backendProf).forEach(k => {
+      if (backendProf[k] !== "" && backendProf[k] !== null && backendProf[k] !== undefined) {
+        currentProf[k] = backendProf[k];
+      }
+    });
+    setProfile(currentProf);
+    localStorage.setItem(`profile_${activeEmail}`, JSON.stringify(currentProf));
 
-    if (savedHistory) {
+    if (userData.scoreHistory && userData.scoreHistory.length > 0) {
+      setScoreHistory(userData.scoreHistory);
+      localStorage.setItem(`scoreHistory_${activeEmail}`, JSON.stringify(userData.scoreHistory));
+    } else if (savedHistory) {
       setScoreHistory(JSON.parse(savedHistory));
     } else {
       setScoreHistory(userData.scoreHistory || []);
     }
 
-    if (savedPrefs) {
-      setPreferences(JSON.parse(savedPrefs));
-    } else {
-      setPreferences(userData.preferences || { targetRole: '', techStack: '', careerGoals: '', workPreference: 'Remote' });
-    }
+    let currentPrefs = savedPrefs ? JSON.parse(savedPrefs) : { targetRole: '', techStack: '', careerGoals: '', workPreference: 'Remote', experienceLevel: 'Fresher' };
+    let backendPrefs = userData.preferences || {};
+    Object.keys(backendPrefs).forEach(k => {
+      if (backendPrefs[k] !== "" && backendPrefs[k] !== null && backendPrefs[k] !== undefined) {
+        currentPrefs[k] = backendPrefs[k];
+      }
+    });
+    setPreferences(currentPrefs);
+    localStorage.setItem(`preferences_${activeEmail}`, JSON.stringify(currentPrefs));
+    setIsProfileLoaded(true);
   };
 
   return (
-    <UserContext.Provider value={{ user, setUser, profile, updateProfile, clearProfile, setUserContext, scoreHistory, preferences, updatePreferences, profileCompletion, missingFields, isProfileLoaded }}>
+    <UserContext.Provider value={{ 
+      user, 
+      setUser, 
+      profile, 
+      updateProfile, 
+      clearProfile, 
+      setUserContext, 
+      scoreHistory, 
+      preferences, 
+      updatePreferences, 
+      profileCompletion, 
+      missingFields, 
+      completionData,
+      isProfileLoaded 
+    }}>
       {children}
     </UserContext.Provider>
   );
 };
-
