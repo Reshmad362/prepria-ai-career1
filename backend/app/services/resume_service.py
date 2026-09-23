@@ -1,12 +1,21 @@
 import os
+import io
 import uuid
 import shutil
 import pdfplumber
 import re
+import logging
+from typing import Dict, Any, List, Union
 from fastapi import UploadFile, HTTPException
-from typing import Dict, Any
+
+import docx
+from docx import Document
+from docx.text.paragraph import Paragraph
+from docx.table import Table
 
 from app.services.skill_extractor import parse_resume_text
+
+logger = logging.getLogger(__name__)
 
 UPLOAD_DIR = "uploads"
 ALLOWED_EXTENSIONS = {".pdf", ".docx"}
@@ -15,11 +24,95 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 # Ensure the local uploads directory exists
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-def extract_text(file: UploadFile) -> str:
-    with pdfplumber.open(file.file) as pdf:
-        text = ""
+def extract_text_from_docx(file_source: Any) -> str:
+    """
+    Extract structured text from a DOCX file, supporting:
+    - Normal paragraphs
+    - Heading 1–6 styles
+    - Bulleted and numbered list items
+    - Standard tables (rows and cells)
+    - Nested tables and multi-paragraph cells
+    - Text runs within paragraphs and cells
+    Preserving sequential document reading order.
+
+    Explicitly Unsupported Structures (Documented):
+    - Embedded OLE objects (e.g., embedded spreadsheets, Visio diagrams)
+    - Vector drawing canvas / SmartArt shapes
+    - Macro-enabled VBA scripts (.docm)
+    - Password-protected / encrypted document packages
+    - Non-textual watermarks / embedded graphic layers
+    """
+    if isinstance(file_source, (bytes, bytearray)):
+        stream = io.BytesIO(file_source)
+    elif hasattr(file_source, "file"):
+        file_source.file.seek(0)
+        content = file_source.file.read()
+        stream = io.BytesIO(content)
+    elif hasattr(file_source, "read"):
+        content = file_source.read()
+        stream = io.BytesIO(content)
+    else:
+        stream = file_source
+
+    doc = Document(stream)
+    
+    def process_container(container) -> List[str]:
+        lines = []
+        if hasattr(container, 'element') and hasattr(container.element, 'body'):
+            body_elm = container.element.body
+        elif hasattr(container, '_element'):
+            body_elm = container._element
+        else:
+            return lines
+
+        for child in body_elm.iterchildren():
+            if child.tag.endswith('p'):
+                p = Paragraph(child, container)
+                text = p.text.strip()
+                if text:
+                    lines.append(text)
+            elif child.tag.endswith('tbl'):
+                t = Table(child, container)
+                for row in t.rows:
+                    row_parts = []
+                    seen_in_row = []
+                    for cell in row.cells:
+                        if any(cell._element is prev for prev in seen_in_row):
+                            continue
+                        seen_in_row.append(cell._element)
+                        cell_lines = process_container(cell)
+                        cell_text = " ".join(cell_lines).strip()
+                        if cell_text:
+                            row_parts.append(cell_text)
+                    if row_parts:
+                        lines.append(" | ".join(row_parts))
+        return lines
+
+    extracted_lines = process_container(doc)
+    return "\n".join(extracted_lines)
+
+def extract_text(file_source: Any) -> str:
+    """
+    Extract text from PDF file-like object or bytes.
+    Preserves backwards compatibility for existing PDF extraction callers.
+    """
+    if isinstance(file_source, (bytes, bytearray)):
+        stream = io.BytesIO(file_source)
+    elif hasattr(file_source, "file"):
+        file_source.file.seek(0)
+        stream = file_source.file
+    elif hasattr(file_source, "read"):
+        content = file_source.read()
+        stream = io.BytesIO(content)
+    else:
+        stream = file_source
+
+    text = ""
+    with pdfplumber.open(stream) as pdf:
         for page in pdf.pages:
-            text += page.extract_text() or ""
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
     return text
 
 def calculate_ats_score(ats_data: Dict[str, Any]) -> int:
@@ -178,10 +271,12 @@ async def process_resume_upload(file: UploadFile) -> Dict[str, Any]:
         
     # 8. PERFORM ATS EXTRACTION
     try:
-        await file.seek(0)
         extracted_text = ""
         if ext == ".pdf":
-            extracted_text = extract_text(file)
+            extracted_text = extract_text(content)
+        elif ext == ".docx":
+            extracted_text = extract_text_from_docx(content)
+            
         # Process the text using our imported skill_extractor
         extracted_data = parse_resume_text(extracted_text)
         
@@ -197,8 +292,8 @@ async def process_resume_upload(file: UploadFile) -> Dict[str, Any]:
         ats_data["score"] = calculate_ats_score(ats_data)
         ats_data["feedback"] = generate_feedback(ats_data, extracted_text)
     except Exception as e:
-        # Prevent upload failure if ATS crashes unexpectedly, return empty parsed data
-        print("ATS Parsing Error:", str(e))
+        # Prevent upload failure if ATS crashes unexpectedly (malformed/corrupted file), return empty parsed data
+        logger.warning("ATS Parsing Error for %s: %s", unique_filename, str(e))
         ats_data = {
            "name": "Extraction Failed",
            "email": "Extraction Failed",
