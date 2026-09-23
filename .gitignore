@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.bak
+*.tmp
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+
+# Node / Frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Environment & Credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Data & Uploads
+uploads/
+backend/uploads/
+backend/app/data/interview_history.json
+backend/app/data/interview_history.json.bak
+backend/app/data/*.bak
+
+# OS / Tooling
+.DS_Store
+Thumbs.db
+powershell.bat
+powershell.cmd
+frontend/powershell.bat
+frontend/powershell.cmd

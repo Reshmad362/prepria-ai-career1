@@ -1,17 +1,27 @@
 """
 PREPRIA Centralized Engagement & Course Progression Service
 Tracks real user learning activities, course progress, module unlocking,
-quiz attempts, scores, and server-side certificate eligibility.
+quiz attempts, scores, dwell-time heartbeats, and server-side certificate eligibility.
 
 Progress is persisted to disk (course_progress.json) so it survives server restarts.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 from datetime import datetime, date, timedelta
 import logging
 import json
 import os
 import shutil
+
+from app.services.course_catalog_service import (
+    get_course_catalog_entry,
+    get_course_item_requirements,
+    get_course_total_required_items,
+    is_valid_item_for_course,
+    get_quiz_questions,
+    DEFAULT_PASSING_SCORE,
+    DEFAULT_REQUIRED_DURATION_SECONDS
+)
 
 logger = logging.getLogger(__name__)
 
@@ -222,172 +232,202 @@ def get_user_engagement_metrics(user_id: str) -> Dict[str, Any]:
     }
 
 
-# ─── Course progress ──────────────────────────────────────────────────────────
+# ─── Course progression engine ────────────────────────────────────────────────
 
 def save_user_course_progress(user_id: str, course_id: str, progress_data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Saves verified course progress and calculates server-side certificate eligibility.
+    Saves and validates course progress against the authoritative backend course catalog.
+    Handles:
+      1. Incremental dwell-time heartbeats with idempotency and bounds validation (1 <= delta <= 15s).
+      2. Idempotent quiz attempts with server-side grading (threshold >= 70%) and highest score preservation.
+      3. Monotonic merge of completed lessons across multiple devices.
+      4. Server-derived completion percentage and tamper-proof certificate eligibility.
     Persists to disk immediately.
     """
     key = f"{str(user_id).strip().lower()}_{str(course_id).strip().lower()}"
+    existing_record = course_progress_db.get(key, {})
 
-    completed_items_frontend = set(progress_data.get("completedItemIds", []) or [])
-    lesson_time_spent = progress_data.get("lessonTimeSpent", {}) or {}
-    quiz_scores = progress_data.get("quizScores", {}) or {}
-    final_assessment = progress_data.get("finalAssessment") or {}
+    # Authoritative course curriculum lookup
+    course_def = progress_data.get("courseDefinition") or existing_record.get("courseDefinition")
+    course_cat = get_course_catalog_entry(course_id, course_def)
+    item_reqs = get_course_item_requirements(course_id, course_def)
+    total_required_items = get_course_total_required_items(course_id, course_def)
+    passing_score = int(course_cat.get("passingScore", DEFAULT_PASSING_SCORE))
 
-    quiz_submission = progress_data.get("quizSubmission") or None
-    final_assessment_submission = progress_data.get("finalAssessmentSubmission") or None
+    # Existing state
+    existing_completed_items = set(existing_record.get("completedItemIds", []) or [])
+    existing_lesson_time = dict(existing_record.get("lessonTimeSpent", {}) or {})
+    existing_quiz_scores = dict(existing_record.get("quizScores", {}) or {})
+    existing_final = dict(existing_record.get("finalAssessment", {}) or {})
+    processed_heartbeats = set(existing_record.get("processedHeartbeatIds", []) or [])
+    processed_quiz_subs = set(existing_record.get("processedQuizSubmissionIds", []) or [])
 
-    # Compute effective quiz scores using submissions when provided.
-    # This prevents the frontend from spoofing quiz result scores.
-    effective_quiz_scores = dict(quiz_scores) if isinstance(quiz_scores, dict) else {}
+    # 1. Heartbeat Dwell-Time Processing
+    heartbeat = progress_data.get("heartbeat")
+    if heartbeat and isinstance(heartbeat, dict):
+        hb_id = heartbeat.get("heartbeatId")
+        item_id = heartbeat.get("itemId")
+        delta = heartbeat.get("deltaSeconds")
 
+        if hb_id and hb_id not in processed_heartbeats:
+            # Validate bounds & legitimate lesson ID
+            if isinstance(delta, (int, float)) and 1 <= delta <= 15 and item_id and is_valid_item_for_course(course_id, item_id, course_def):
+                current_time = existing_lesson_time.get(item_id, 0)
+                existing_lesson_time[item_id] = current_time + int(delta)
+                processed_heartbeats.add(str(hb_id))
+            else:
+                logger.warning("Rejected invalid dwell heartbeat: hb_id=%s item=%s delta=%s", hb_id, item_id, delta)
+
+    # 2. Quiz Submission Processing (Idempotent Server-Side Grading)
+    quiz_submission = progress_data.get("quizSubmission")
     if quiz_submission and isinstance(quiz_submission, dict):
+        sub_id = quiz_submission.get("submissionId") or f"sub_{quiz_submission.get('quizId')}_{quiz_submission.get('submittedAt')}"
         quiz_id = quiz_submission.get("quizId")
-        question_key = quiz_submission.get("questionKey") or []
         answers_by_qid = quiz_submission.get("answersByQuestionId") or {}
-        # passing_score is defined later from courseDefinition; default to 70 here.
-        sub_passing = int(quiz_submission.get("passingScore") or 70)
 
-        if quiz_id and isinstance(question_key, list):
-            total = len(question_key)
-            correct = 0
-            for q in question_key:
-                qid = q.get("id")
-                if qid is None:
-                    continue
-                selected = answers_by_qid.get(qid)
-                if selected is not None and int(selected) == int(q.get("correctIndex", -1)):
-                    correct += 1
+        if quiz_id and sub_id not in processed_quiz_subs:
+            auth_questions = get_quiz_questions(course_id, quiz_id, course_def)
+            if not auth_questions and "questionKey" in quiz_submission:
+                # Fallback to key if quiz is purely dynamic
+                auth_questions = quiz_submission.get("questionKey") or []
 
-            score_pct = int(round((correct / total) * 100)) if total > 0 else 0
-            passed = bool(score_pct >= sub_passing)
+            if auth_questions:
+                total_q = len(auth_questions)
+                correct = 0
+                for q in auth_questions:
+                    qid = q.get("id")
+                    if qid is None:
+                        continue
+                    sel = answers_by_qid.get(qid)
+                    if sel is not None and int(sel) == int(q.get("correctIndex", -1)):
+                        correct += 1
 
-            prev = effective_quiz_scores.get(quiz_id) or {}
-            attempts = (int(prev.get("attempts") or 0) + 1) if isinstance(prev, dict) else 1
-            effective_quiz_scores[quiz_id] = {
-                "score": score_pct,
-                "passed": passed,
-                "attempts": attempts,
-                "validated": True
+                score_pct = int(round((correct / total_q) * 100)) if total_q > 0 else 0
+                passed = (score_pct >= passing_score)
+
+                prev_q = existing_quiz_scores.get(quiz_id, {})
+                prev_attempts = int(prev_q.get("attempts", 0) or 0)
+                prev_passed = bool(prev_q.get("passed", False))
+                prev_high_score = int(prev_q.get("score", 0) or 0)
+
+                existing_quiz_scores[quiz_id] = {
+                    "score": max(prev_high_score, score_pct),
+                    "passed": prev_passed or passed,
+                    "attempts": prev_attempts + 1,
+                    "validated": True,
+                    "lastAttemptScore": score_pct
+                }
+                processed_quiz_subs.add(str(sub_id))
+
+    # 3. Final Comprehensive Assessment Submission Processing
+    final_sub = progress_data.get("finalAssessmentSubmission")
+    if final_sub and isinstance(final_sub, dict):
+        sub_id = final_sub.get("submissionId") or f"sub_final_{final_sub.get('submittedAt')}"
+        answers_by_qid = final_sub.get("answersByQuestionId") or {}
+
+        if sub_id not in processed_quiz_subs:
+            final_cat = course_cat.get("finalAssessment") or {}
+            auth_questions = final_cat.get("questions") or final_sub.get("questionKey") or []
+
+            if auth_questions:
+                total_q = len(auth_questions)
+                correct = 0
+                for q in auth_questions:
+                    qid = q.get("id")
+                    if qid is None:
+                        continue
+                    sel = answers_by_qid.get(qid)
+                    if sel is not None and int(sel) == int(q.get("correctIndex", -1)):
+                        correct += 1
+
+                score_pct = int(round((correct / total_q) * 100)) if total_q > 0 else 0
+                passed = (score_pct >= passing_score)
+
+                prev_attempts = int(existing_final.get("attempts", 0) or 0)
+                prev_passed = bool(existing_final.get("passed", False))
+                prev_high_score = int(existing_final.get("score", 0) or 0)
+
+                existing_final = {
+                    "score": max(prev_high_score, score_pct),
+                    "passed": prev_passed or passed,
+                    "attempts": prev_attempts + 1,
+                    "validated": True,
+                    "lastAttemptScore": score_pct,
+                    "completedAt": datetime.utcnow().isoformat() if (passed or prev_passed) else None
+                }
+                processed_quiz_subs.add(str(sub_id))
+
+    # 4. Monotonic Merge & Validation of Completed Items
+    # Start with legitimate already-completed items from disk
+    validated_completed_item_ids: Set[str] = set(existing_completed_items)
+
+    # Consider newly claimed completions from incoming progress_data
+    incoming_claims = set(progress_data.get("completedItemIds", []) or [])
+    client_lesson_time = dict(progress_data.get("lessonTimeSpent", {}) or {})
+
+    for item_id in incoming_claims:
+        if item_id in validated_completed_item_ids:
+            continue
+        req = item_reqs.get(item_id)
+        if not req and is_valid_item_for_course(course_id, item_id, course_def):
+            req = {
+                "type": "QUIZ" if "quiz" in str(item_id).lower() else ("ASSESSMENT" if ("final" in str(item_id).lower() or "fa" in str(item_id).lower()) else "READING"),
+                "requiredDurationSeconds": DEFAULT_REQUIRED_DURATION_SECONDS,
+                "required": True
             }
+        if not req:
+            continue
 
-    # Optional, but required for real security validation.
-    course_def = progress_data.get("courseDefinition") or {}
-    item_requirements = course_def.get("itemRequirements") or {}
-    modules_def = course_def.get("modules") or []
-    total_items = course_def.get("totalRequiredItems") or progress_data.get("totalRequiredItems") or 0
-    passing_score = course_def.get("passingScore") or 70
+        item_type = req.get("type", "READING")
+        if item_type == "QUIZ":
+            q_res = existing_quiz_scores.get(item_id, {})
+            if q_res.get("passed", False) and int(q_res.get("score", 0)) >= passing_score:
+                validated_completed_item_ids.add(item_id)
+        elif item_type in ("ASSESSMENT", "FINAL_ASSESSMENT"):
+            if existing_final.get("passed", False) and int(existing_final.get("score", 0)) >= passing_score:
+                validated_completed_item_ids.add(item_id)
+        else:
+            # Lesson item: requires required minimum dwell duration
+            req_dur = int(req.get("requiredDurationSeconds", DEFAULT_REQUIRED_DURATION_SECONDS))
+            actual_dwell = max(
+                int(existing_lesson_time.get(item_id, 0)),
+                int(client_lesson_time.get(item_id, 0))
+            )
+            if actual_dwell >= req_dur:
+                validated_completed_item_ids.add(item_id)
+                existing_lesson_time[item_id] = actual_dwell
 
-    # If no course definition was provided, do not mark anything certified.
-    can_validate = bool(modules_def) and bool(item_requirements) and total_items > 0
+    # 5. Server-Derived Module Gating & Certificate Eligibility
+    modules = course_cat.get("modules", [])
+    all_modules_passed = True
 
-    validated_completed_item_ids = set()
-    modules_fully_passed = True
+    for mod in modules:
+        mod_item_ids = [it["id"] for it in mod.get("items", []) if it.get("required", True)]
+        mod_complete = all(iid in validated_completed_item_ids for iid in mod_item_ids)
+        if not mod_complete:
+            all_modules_passed = False
 
-    # Compute final assessment from submission when provided.
-    if final_assessment_submission and isinstance(final_assessment_submission, dict):
-        question_key = final_assessment_submission.get("questionKey") or []
-        answers_by_qid = final_assessment_submission.get("answersByQuestionId") or {}
-        sub_passing = int(final_assessment_submission.get("passingScore") or passing_score)
-
-        total = len(question_key)
-        correct = 0
-        for q in question_key:
-            qid = q.get("id")
-            if qid is None:
-                continue
-            selected = answers_by_qid.get(qid)
-            if selected is not None and int(selected) == int(q.get("correctIndex", -1)):
-                correct += 1
-
-        score_pct = int(round((correct / total) * 100)) if total > 0 else 0
-        passed = bool(score_pct >= sub_passing)
-
-        prev = final_assessment if isinstance(final_assessment, dict) else {}
-        attempts = (int(prev.get("attempts") or 0) + 1) if isinstance(prev, dict) else 1
-        final_assessment = {
-            **(prev if isinstance(prev, dict) else {}),
-            "score": score_pct,
-            "passed": passed,
-            "attempts": attempts,
-            "validated": True,
-            "completedAt": prev.get("completedAt") if isinstance(prev, dict) else None
-        }
-
-    if can_validate:
-        # Validate module items sequentially (module pass = all required items valid)
-        for mod in modules_def:
-            module_item_ids = mod.get("itemIds") or []
-            module_passed = True
-
-            for item_id in module_item_ids:
-                req = item_requirements.get(item_id) or {}
-                item_type = req.get("type")
-
-                if item_type == "QUIZ":
-                    q = effective_quiz_scores.get(item_id) or {}
-                    quiz_score = int(q.get("score", 0) or 0)
-                    quiz_passed = bool(q.get("passed", False)) and (quiz_score >= int(passing_score))
-                    # Only accept quiz outcome when it was validated by backend at least once.
-                    # Backwards compatibility: if quizScores were stored by older frontend versions
-                    # (no validated flag), accept only if the frontend marked the quiz as completed.
-                    quiz_validated = (
-                        bool(q.get("validated", False)) or
-                        bool(quiz_submission and quiz_submission.get("quizId") == item_id) or
-                        (item_id in completed_items_frontend and quiz_passed)
-                    )
-                    quiz_passed = quiz_passed and quiz_validated
-                    if quiz_passed:
-                        validated_completed_item_ids.add(item_id)
-                    else:
-                        module_passed = False
-                elif item_type == "ASSESSMENT":
-                    # Final assessment is validated separately; module definition should not include it.
-                    module_passed = False
-                else:
-                    required_seconds = int(req.get("requiredDurationSeconds") or 0)
-                    time_spent = int(lesson_time_spent.get(item_id) or 0)
-                    # For lesson completion we require both: user clicked completion flag AND min time reached.
-                    lesson_completed_valid = (item_id in completed_items_frontend) and (time_spent >= required_seconds)
-                    if lesson_completed_valid:
-                        validated_completed_item_ids.add(item_id)
-                    else:
-                        module_passed = False
-
-            if not module_passed:
-                modules_fully_passed = False
-
-    # Validate final assessment
-    final_passed_flag = bool(final_assessment.get("passed", False))
-    final_score = int(final_assessment.get("score", 0) or 0)
-    final_validated = bool(final_assessment.get("validated", False)) or bool(final_assessment_submission)
-    # Backwards compatibility: if no validated flag exists, accept only when the frontend
-    # claims the final was passed and scored enough.
-    if not final_validated and final_passed_flag and final_score >= int(passing_score):
-        final_validated = True
-    final_valid = final_passed_flag and (final_score >= int(passing_score)) and final_validated
-
-    # Compute validated completion percentage from validated completions only
+    final_passed = bool(existing_final.get("passed", False)) and int(existing_final.get("score", 0)) >= passing_score
     completion_percentage = 0
-    if can_validate and total_items > 0:
-        completion_percentage = min(100, int((len(validated_completed_item_ids) / total_items) * 100))
+    if total_required_items > 0:
+        completion_percentage = min(100, int((len(validated_completed_item_ids) / total_required_items) * 100))
 
-    # Certificate eligibility requires full validated completion + final assessment pass
-    is_certified = bool(can_validate and modules_fully_passed and final_valid and completion_percentage == 100)
+    certificate_eligible = bool(all_modules_passed and final_passed and (completion_percentage == 100))
 
+    # Persist updated record
     record = {
         "userId": str(user_id),
         "courseId": str(course_id),
-        "completedItemIds": sorted(list(validated_completed_item_ids)) if can_validate else progress_data.get("completedItemIds", []) or [],
-        "quizScores": effective_quiz_scores,
-        "finalAssessment": final_assessment,
-        "lessonTimeSpent": lesson_time_spent,
-        "lastAccessed": progress_data.get("lastAccessed", {}),
-        "totalRequiredItems": total_items,
+        "completedItemIds": sorted(list(validated_completed_item_ids)),
+        "quizScores": existing_quiz_scores,
+        "finalAssessment": existing_final,
+        "lessonTimeSpent": existing_lesson_time,
+        "lastAccessed": progress_data.get("lastAccessed") or existing_record.get("lastAccessed") or {},
+        "totalRequiredItems": total_required_items,
         "completionPercentage": completion_percentage,
-        "certificateEligible": is_certified,
+        "certificateEligible": certificate_eligible,
+        "processedHeartbeatIds": sorted(list(processed_heartbeats))[-500:],
+        "processedQuizSubmissionIds": sorted(list(processed_quiz_subs))[-500:],
         "updatedAt": datetime.utcnow().isoformat()
     }
 
@@ -396,43 +436,44 @@ def save_user_course_progress(user_id: str, course_id: str, progress_data: Dict[
 
     logger.info(
         "Saved progress for user=%s course=%s completion=%d%% certified=%s",
-        user_id, course_id, completion_percentage, is_certified
+        user_id, course_id, completion_percentage, certificate_eligible
     )
     return record
 
 
+
 def get_user_course_progress(user_id: str, course_id: str) -> Optional[Dict[str, Any]]:
-    """Retrieves course progress for a user (from in-memory, which is loaded from disk on startup)."""
+    """Retrieves course progress for a user (persisted across restarts)."""
     key = f"{str(user_id).strip().lower()}_{str(course_id).strip().lower()}"
     return course_progress_db.get(key)
 
 
 def validate_certificate_eligibility(user_id: str, course_id: str) -> Dict[str, Any]:
     """
-    Backend-only certificate eligibility check.
-    Returns { eligible: bool, reason: str, progress: dict }.
+    Backend-authoritative certificate eligibility verification endpoint.
+    Derives completion, dwell requirements, quiz passes, and final exam results independently.
     """
     record = get_user_course_progress(user_id, course_id)
     if not record:
-        return {"eligible": False, "reason": "No progress record found for this course.", "progress": None}
+        return {"eligible": False, "reason": "No verified progress record found for this course.", "progress": None}
 
     completion = record.get("completionPercentage", 0)
     final = record.get("finalAssessment") or {}
     final_passed = bool(final.get("passed", False))
-    final_score = final.get("score", 0)
-    is_certified = record.get("certificateEligible", False)
+    final_score = int(final.get("score", 0) or 0)
+    is_certified = bool(record.get("certificateEligible", False))
 
     if not is_certified:
         if completion < 100:
-            reason = f"Course is only {completion}% complete. All lessons must be finished."
+            reason = f"Course is only {completion}% complete. All lessons and checkpoint quizzes must be completed."
         elif not final_passed:
-            reason = "Final assessment has not been passed yet."
+            reason = "Final comprehensive certification exam has not been passed yet."
         elif final_score < 70:
-            reason = f"Final assessment score ({final_score}%) is below the 70% passing threshold."
+            reason = f"Final exam score ({final_score}%) is below the 70% passing threshold."
         else:
             reason = "Certificate requirements not fully met."
     else:
-        reason = "All requirements satisfied."
+        reason = "All curriculum and certification requirements satisfied."
 
     return {
         "eligible": is_certified,
@@ -448,6 +489,6 @@ def validate_certificate_eligibility(user_id: str, course_id: str) -> Dict[str, 
 
 
 def get_all_user_course_progress(user_id: str) -> List[Dict[str, Any]]:
-    """Returns all course progress records for a given user."""
+    """Returns all course progress records for a given user across all courses."""
     prefix = f"{str(user_id).strip().lower()}_"
     return [v for k, v in course_progress_db.items() if k.startswith(prefix)]

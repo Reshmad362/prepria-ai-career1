@@ -13,6 +13,7 @@ import {
   evaluateInterviewSubmission 
 } from '../utils/interviewQuestionEngine';
 import { useInterviewProctoring } from '../hooks/useInterviewProctoring';
+import { API_URL } from '../utils/api';
 
 export default function InterviewScreen() {
   const navigate = useNavigate();
@@ -511,23 +512,60 @@ export default function InterviewScreen() {
     setIsFinished(true);
     setSessionStatus('COMPLETED');
 
-    const evaluation = evaluateInterviewSubmission({
+    const token = localStorage.getItem('token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const payload = {
       roleName: interviewConfig.roleName || targetRole,
       difficulty: interviewConfig.difficulty || "Intermediate",
-      answers: finalAnswers,
+      interviewType: interviewConfig.interviewType || "Technical",
       questions: questionsList,
-      userSkills: profile?.skills || [],
-      sessionDuration: formattedTime
-    });
+      answers: finalAnswers,
+      duration: formattedTime,
+      violationsCount: warningCount,
+      userId: activeEmail
+    };
+
+    let evaluation = null;
+    let backendSession = null;
+
+    try {
+      const resp = await fetch(`${API_URL}/interview/session/submit`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.evaluation) {
+          evaluation = data.evaluation;
+          backendSession = data.session;
+        }
+      }
+    } catch (e) {
+      console.warn("Backend evaluation endpoint unreachable, falling back to client engine:", e);
+    }
+
+    if (!evaluation) {
+      evaluation = evaluateInterviewSubmission({
+        roleName: interviewConfig.roleName || targetRole,
+        difficulty: interviewConfig.difficulty || "Intermediate",
+        answers: finalAnswers,
+        questions: questionsList,
+        userSkills: profile?.skills || [],
+        sessionDuration: formattedTime
+      });
+    }
 
     setEvaluationResult(evaluation);
 
-    // ONLY SAVE AND LOG TO ANALYTICS IF AT LEAST 1 REAL ANSWER WAS PROVIDED
+    // ONLY SAVE AND LOG TO LOCALSTORAGE IF AT LEAST 1 REAL ANSWER WAS PROVIDED
     if (evaluation.isValid && evaluation.answeredCount > 0) {
       try {
         const historyKey = `interview_history_${activeEmail}`;
         const existingHistory = JSON.parse(localStorage.getItem(historyKey) || '[]');
-        const newEntry = {
+        const newEntry = backendSession || {
           id: `sess-${Date.now()}`,
           roleName: interviewConfig.roleName || targetRole,
           difficulty: interviewConfig.difficulty || "Intermediate",
@@ -535,7 +573,7 @@ export default function InterviewScreen() {
           duration: formattedTime,
           answeredCount: evaluation.answeredCount,
           questionCount: totalQuestions,
-          date: evaluation.completedAt,
+          date: evaluation.completedAt || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
           evaluation: evaluation,
           violationsCount: warningCount
         };
@@ -545,12 +583,14 @@ export default function InterviewScreen() {
 
       // Log to Backend Analytics API
       try {
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-        await fetch(`${API_URL}/api/analytics/activity/record`, {
+        await fetch(`${API_URL}/analytics/activity/record`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
+            user_id: activeEmail,
             activity_type: "mock_interview",
+            title: `Completed Mock Interview: ${interviewConfig.roleName || targetRole}`,
+            duration_minutes: 20,
             metadata: {
               role: interviewConfig.roleName || targetRole,
               score: evaluation.overallScore,

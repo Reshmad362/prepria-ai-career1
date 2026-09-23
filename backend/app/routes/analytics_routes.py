@@ -12,6 +12,7 @@ from app.services.engagement_service import (
     validate_certificate_eligibility,
     get_all_user_course_progress
 )
+from app.routes.auth_routes import get_current_user, verify_user_ownership
 
 router = APIRouter(prefix="/analytics", tags=["Longitudinal Analytics & Engagement"])
 
@@ -42,8 +43,14 @@ class CourseProgressPayload(BaseModel):
 
 
 @router.post("/record")
-async def log_interview(req: InterviewResultLog):
+async def log_interview(req: InterviewResultLog, authorization: Optional[str] = Header(None)):
+    current_user = get_current_user(authorization)
+    if not verify_user_ownership(req.user_id, current_user):
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to submit data for another user.")
+
     data = req.dict()
+    # Enforce authenticated identity
+    data["user_id"] = current_user.get("email") or current_user.get("id")
     if not data.get('timestamp'):
         data['timestamp'] = datetime.utcnow().isoformat()
     record_interview(data)
@@ -59,10 +66,16 @@ async def log_interview(req: InterviewResultLog):
 
 
 @router.post("/activity/record")
-async def log_activity(req: UserActivityLog):
+async def log_activity(req: UserActivityLog, authorization: Optional[str] = Header(None)):
     """Central endpoint to record any learning activity (lesson, quiz, course, certificate)."""
+    current_user = get_current_user(authorization)
+    if not verify_user_ownership(req.user_id, current_user):
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to record activity for another user.")
+
     try:
         data = req.dict()
+        # Enforce authenticated identity
+        data["user_id"] = current_user.get("email") or current_user.get("id")
         recorded = record_user_activity(data)
         return {"success": True, "data": recorded}
     except Exception as e:
@@ -70,89 +83,129 @@ async def log_activity(req: UserActivityLog):
 
 
 @router.get("/engagement/{user_id}")
-async def get_engagement(user_id: str):
+async def get_engagement(user_id: str, authorization: Optional[str] = Header(None)):
     """Returns authentic engagement metrics: streak, learning time, weekly heatmap, etc."""
+    current_user = get_current_user(authorization)
+    if not verify_user_ownership(user_id, current_user):
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to access another user's engagement data.")
+
     try:
-        engagement = get_user_engagement_metrics(user_id)
+        # Use verified user ID / email
+        auth_user_key = current_user.get("email") or current_user.get("id")
+        engagement = get_user_engagement_metrics(auth_user_key)
         return {"success": True, "data": engagement}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/activity/{user_id}")
-async def get_activities(user_id: str, limit: int = 15):
+async def get_activities(user_id: str, limit: int = 15, authorization: Optional[str] = Header(None)):
     """Returns recent meaningful learning activities for the user."""
+    current_user = get_current_user(authorization)
+    if not verify_user_ownership(user_id, current_user):
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to access another user's activities.")
+
     try:
-        acts = get_user_activities(user_id, limit=limit)
+        auth_user_key = current_user.get("email") or current_user.get("id")
+        acts = get_user_activities(auth_user_key, limit=limit)
         return {"success": True, "data": acts}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/course/progress")
-async def save_progress(req: CourseProgressPayload):
+async def save_progress(req: CourseProgressPayload, authorization: Optional[str] = Header(None)):
     """
     Saves verified course progress with server-side certificate eligibility validation.
     Progress is persisted to disk and survives server restarts.
     """
+    current_user = get_current_user(authorization)
+    if not verify_user_ownership(req.user_id, current_user):
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to modify another user's course progress.")
+
     try:
-        saved = save_user_course_progress(req.user_id, req.course_id, req.progress_data)
+        auth_user_key = current_user.get("email") or current_user.get("id")
+        saved = save_user_course_progress(auth_user_key, req.course_id, req.progress_data)
         return {"success": True, "data": saved}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/course/progress/{user_id}/{course_id}")
-async def get_progress(user_id: str, course_id: str):
+async def get_progress(user_id: str, course_id: str, authorization: Optional[str] = Header(None)):
     """Retrieves stored course progress for a user (persisted from previous sessions)."""
+    current_user = get_current_user(authorization)
+    if not verify_user_ownership(user_id, current_user):
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to access another user's course progress.")
+
     try:
-        prog = get_user_course_progress(user_id, course_id)
+        auth_user_key = current_user.get("email") or current_user.get("id")
+        prog = get_user_course_progress(auth_user_key, course_id)
         return {"success": True, "data": prog}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/course/progress/{user_id}")
-async def get_all_progress(user_id: str):
+async def get_all_progress(user_id: str, authorization: Optional[str] = Header(None)):
     """Returns all course progress records for a user across all courses."""
+    current_user = get_current_user(authorization)
+    if not verify_user_ownership(user_id, current_user):
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to access another user's course progress.")
+
     try:
-        all_prog = get_all_user_course_progress(user_id)
+        auth_user_key = current_user.get("email") or current_user.get("id")
+        all_prog = get_all_user_course_progress(auth_user_key)
         return {"success": True, "data": all_prog}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/course/certificate/{user_id}/{course_id}")
-async def check_certificate(user_id: str, course_id: str):
+async def check_certificate(user_id: str, course_id: str, authorization: Optional[str] = Header(None)):
     """
     Backend certificate eligibility validation endpoint.
     Frontend Certificate.jsx calls this to confirm eligibility independently of localStorage.
     """
+    current_user = get_current_user(authorization)
+    if not verify_user_ownership(user_id, current_user):
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to access another user's certificate.")
+
     try:
-        result = validate_certificate_eligibility(user_id, course_id)
+        auth_user_key = current_user.get("email") or current_user.get("id")
+        result = validate_certificate_eligibility(auth_user_key, course_id)
         return {"success": True, "data": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/growth/{user_id}")
-async def get_growth(user_id: str):
+async def get_growth(user_id: str, authorization: Optional[str] = Header(None)):
+    current_user = get_current_user(authorization)
+    if not verify_user_ownership(user_id, current_user):
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to access another user's growth analytics.")
+
     try:
-        analytics = get_growth_analytics(user_id)
+        auth_user_key = current_user.get("email") or current_user.get("id")
+        analytics = get_growth_analytics(auth_user_key)
         return {"success": True, "data": analytics}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/dashboard/{user_id}")
-async def get_dashboard(user_id: str):
+async def get_dashboard(user_id: str, authorization: Optional[str] = Header(None)):
     """
     Backend endpoint required by `frontend/src/pages/Dashboard.jsx`.
-    The frontend expects a specific JSON shape for executive KPI cards,
-    longitudinal chart history, weekly heatmap, and recent activities.
+    Enforces JWT authentication and resource ownership.
     """
+    current_user = get_current_user(authorization)
+    if not verify_user_ownership(user_id, current_user):
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to access another user's dashboard.")
+
     try:
-        user_lower = str(user_id).strip().lower()
+        auth_user_key = current_user.get("email") or current_user.get("id")
+        user_lower = str(auth_user_key).strip().lower()
 
         # Engagement metrics (streak, lessons, weekly heatmap, certs, etc.)
         engagement = get_user_engagement_metrics(user_lower)
@@ -182,7 +235,6 @@ async def get_dashboard(user_id: str):
         # Weekly heatmap: Dashboard.jsx expects 7 items with { dayName, active, minutes, lessons }
         weekly_breakdown = engagement.get("weeklyBreakdown") or []
         weekly_activity = []
-        # weeklyBreakdown is Mon..Sun already in engagement_service
         for i in range(7):
             day_obj = weekly_breakdown[i] if i < len(weekly_breakdown) else None
             weekly_activity.append({
@@ -202,7 +254,6 @@ async def get_dashboard(user_id: str):
             "Low"
         )
 
-        # Recommended next step (keep safe defaults; UI already has its own profile completion alerts)
         recommended_next_step = "Upload Resume"
 
         data = {
@@ -238,5 +289,7 @@ async def get_dashboard(user_id: str):
         }
 
         return {"success": True, "data": data}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

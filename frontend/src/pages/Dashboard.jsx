@@ -12,6 +12,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { formatTime } from '../utils/activityLogger';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { API_URL } from '../utils/api';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -87,7 +88,7 @@ export default function Dashboard() {
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
         const response = await fetch(
-          `http://localhost:8000/analytics/dashboard/${encodeURIComponent(authenticatedUserId)}`,
+          `${API_URL}/analytics/dashboard/${encodeURIComponent(authenticatedUserId)}`,
           { headers }
         );
         if (!response.ok) throw new Error('Failed to fetch analytics');

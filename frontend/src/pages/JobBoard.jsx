@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { INITIAL_CAREER_OPPORTUNITIES } from '../data/jobsData';
 import { calculateJobAnalysis, getTrackedJobs, updateJobTrackingStatus } from '../utils/jobMatchingService';
+import { API_URL } from '../utils/api';
 
 export default function JobBoard() {
   const navigate = useNavigate();
@@ -62,7 +63,6 @@ export default function JobBoard() {
   useEffect(() => {
     const fetchApiJobs = async () => {
       try {
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
         const res = await fetch(`${API_URL}/api/jobs/match`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

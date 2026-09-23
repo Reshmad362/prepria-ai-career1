@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { coursesData, categoryLearningPaths, CATEGORY_CONFIG, normalizeCategorySlug } from '../data/coursesData';
 import { UserContext } from '../contexts/UserContext';
-import { getCourseActionState, fetchEngagementMetrics } from '../utils/engagementService';
+import { getCourseActionState, fetchEngagementMetrics, hydrateAllProgressFromBackend } from '../utils/engagementService';
 
 export default function MyCourses() {
   const navigate = useNavigate();
@@ -19,6 +19,7 @@ export default function MyCourses() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedDifficulty, setSelectedDifficulty] = useState('All');
   const [selectedStatus, setSelectedStatus] = useState('All');
+  const [progressVersion, setProgressVersion] = useState(0);
   const [engagement, setEngagement] = useState({
     currentStreak: 0,
     learningTime: { thisWeekFormatted: "0m", thisWeekMinutes: 0 },
@@ -31,18 +32,22 @@ export default function MyCourses() {
   const targetRole = profile?.targetRole || preferences?.targetRole || 'Full Stack Developer';
   const extractedSkills = profile?.skills || [];
 
-  // Fetch true engagement stats
+  // Fetch true engagement stats and hydrate multi-device progress
   useEffect(() => {
-    const loadEngagement = async () => {
+    const loadData = async () => {
+      await hydrateAllProgressFromBackend(email);
+      setProgressVersion(v => v + 1);
       const data = await fetchEngagementMetrics(email);
       if (data) setEngagement(data);
     };
-    loadEngagement();
-    window.addEventListener('activityLogged', loadEngagement);
-    window.addEventListener('progressUpdated', loadEngagement);
+    loadData();
+
+    const onProgressUpdated = () => setProgressVersion(v => v + 1);
+    window.addEventListener('activityLogged', loadData);
+    window.addEventListener('progressUpdated', onProgressUpdated);
     return () => {
-      window.removeEventListener('activityLogged', loadEngagement);
-      window.removeEventListener('progressUpdated', loadEngagement);
+      window.removeEventListener('activityLogged', loadData);
+      window.removeEventListener('progressUpdated', onProgressUpdated);
     };
   }, [email]);
 
@@ -71,7 +76,7 @@ export default function MyCourses() {
         totalItems
       };
     });
-  }, [email]);
+  }, [email, progressVersion]);
 
   // Overall Statistics
   const inProgressCourses = processedCourses.filter(c => c.status === 'in-progress');

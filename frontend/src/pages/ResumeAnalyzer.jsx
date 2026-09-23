@@ -3,6 +3,7 @@ import { UploadCloud, CheckCircle2, AlertTriangle, FileText, Loader2, Sparkles, 
 import { logActivity } from '../utils/activityLogger';
 import { UserContext } from '../contexts/UserContext';
 import { useNavigate } from 'react-router-dom';
+import { API_URL } from '../utils/api';
 
 export default function ResumeAnalyzer() {
   const { user } = useContext(UserContext);
@@ -62,8 +63,10 @@ export default function ResumeAnalyzer() {
     formData.append('file', file);
 
     try {
-      const response = await fetch('http://localhost:8000/upload-resume', {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/upload-resume`, {
         method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         body: formData,
       });
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { Target, TrendingUp, Zap, CheckCircle2 } from 'lucide-react';
+import { API_URL } from '../utils/api';
 
 export default function GrowthDashboard() {
   const [data, setData] = useState(null);
@@ -9,9 +10,13 @@ export default function GrowthDashboard() {
   useEffect(() => {
     // Fetch from the analytics backend endpoint
     const fetchAnalytics = async () => {
-      if (!user.id) return;
+      const authKey = user.email || localStorage.getItem('activeUser') || user.id;
+      if (!authKey) return;
       try {
-        const res = await fetch(`http://localhost:8000/analytics/growth/${user.id}`);
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${API_URL}/analytics/growth/${encodeURIComponent(authKey)}`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
         const result = await res.json();
         if (result.success) {
           setData(result.data);

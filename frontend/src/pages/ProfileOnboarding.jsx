@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { UserContext } from '../contexts/UserContext';
 import { Target, Phone, User as UserIcon, ArrowRight, ShieldCheck, ChevronRight, Sparkles, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import { logActivity } from '../utils/activityLogger';
+import { API_URL } from '../utils/api';
 
 export default function ProfileOnboarding() {
   const navigate = useNavigate();
@@ -76,7 +77,6 @@ export default function ProfileOnboarding() {
     setErrorMsg('');
 
     const token = localStorage.getItem('token');
-    const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
     
     try {
       if (token) {

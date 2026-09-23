@@ -18,7 +18,11 @@ from app.services.auth_service import (
     google_login as google_login_service,
     generate_reset_token,
     reset_password,
-    otp_manager
+    otp_manager,
+    hash_password,
+    sanitize_user,
+    JWT_SECRET,
+    JWT_ALGORITHM
 )
 from app.services.email_service import (
     send_notification_email,
@@ -41,7 +45,8 @@ def find_user_by_email(email: str):
             return u
     return None
 
-def get_current_user_from_header(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
+def get_current_user(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
+    """Authoritative backend authentication dependency extracting user from validated JWT."""
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid authentication token")
     token = authorization.split("Bearer ")[1].strip()
@@ -50,11 +55,34 @@ def get_current_user_from_header(authorization: Optional[str] = Header(None)) ->
         raise HTTPException(status_code=401, detail="Invalid or expired session token")
     
     email = payload.get("email")
-    user_id = payload.get("sub")
+    user_id = payload.get("sub") or payload.get("id")
     user = get_user_by_email_or_id(email=email, user_id=user_id)
     if not user:
-        raise HTTPException(status_code=401, detail="User session expired. Please log in again.")
+        if email or user_id:
+            user = {
+                "id": user_id or email,
+                "email": email or user_id,
+                "name": payload.get("name", "User"),
+                "role": payload.get("role", "candidate"),
+                "profile": {},
+                "preferences": {},
+                "scoreHistory": []
+            }
+        else:
+            raise HTTPException(status_code=401, detail="User session expired. Please log in again.")
     return user
+
+# Alias for backward compatibility
+get_current_user_from_header = get_current_user
+
+def verify_user_ownership(requested_id: Optional[str], current_user: Dict[str, Any]) -> bool:
+    """Validate that the requested resource identifier matches the authenticated JWT identity."""
+    if not requested_id:
+        return True
+    user_id = str(current_user.get("id", "")).strip().lower()
+    email = str(current_user.get("email", "")).strip().lower()
+    req_clean = str(requested_id).strip().lower()
+    return req_clean == user_id or req_clean == email
 
 class SignupRequest(BaseModel):
     name: str
@@ -280,7 +308,7 @@ async def set_password_route(req: SetPasswordRequest, authorization: Optional[st
     email = user["email"]
     for u in users_db:
         if u.get("email", "").strip().lower() == email.strip().lower():
-            u["password"] = req.new_password
+            u["password"] = hash_password(req.new_password)
             _save_users_to_disk()
             logger.info("Password updated successfully for user: %s", email)
             return {"success": True, "message": "Password set successfully. You can now log in with your email and password."}

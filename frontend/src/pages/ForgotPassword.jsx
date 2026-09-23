@@ -5,8 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import AuthLayout from '../components/AuthLayout';
 import AuthCard from '../components/AuthCard';
 import LoadingButton from '../components/LoadingButton';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+import { API_URL } from '../utils/api';
 
 
 export default function ForgotPassword() {

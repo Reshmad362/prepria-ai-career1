@@ -1,20 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import CareerSuggestionCard from '../components/CareerSuggestionCard';
 import { Compass, BookOpen, AlertTriangle, PlayCircle } from 'lucide-react';
+import { API_URL } from '../utils/api';
 
 export default function CareerSuggestions() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const activeEmail = user.email || localStorage.getItem('activeUser') || user.id || 'default_user';
 
   useEffect(() => {
     const fetchSuggestions = async () => {
       try {
-        const res = await fetch('http://localhost:8000/career-suggestions', {
+        const token = localStorage.getItem('token');
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        const res = await fetch(`${API_URL}/career-suggestions`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
-            user_id: user.id || "123",
+            user_id: activeEmail,
             resume_skills: ["Java", "React"],
             matched_roles: ["Backend Developer"],
             latest_score: 0.68,
@@ -32,7 +39,7 @@ export default function CareerSuggestions() {
       }
     };
     fetchSuggestions();
-  }, [user.id]);
+  }, [activeEmail]);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-on-surface">Generating Career Roadmap...</div>;
   if (!data) return <div className="min-h-screen flex items-center justify-center text-error">Failed to load suggestions.</div>;

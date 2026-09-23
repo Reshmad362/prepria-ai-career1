@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { calculateProfileCompletion } from '../utils/profileCompletion';
+import { API_URL } from '../utils/api';
 
 export const UserContext = createContext();
 
@@ -98,8 +99,6 @@ export const UserProvider = ({ children }) => {
     }
     
     if (token) {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
-
       fetch(`${API_URL}/auth/me`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
@@ -282,7 +281,6 @@ export const UserProvider = ({ children }) => {
 
     // Asynchronously sync to backend if authenticated
     const token = localStorage.getItem('token');
-    const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
     if (token) {
       fetch(`${API_URL}/auth/profile`, {
         method: 'PUT',
@@ -319,7 +317,6 @@ export const UserProvider = ({ children }) => {
 
     // Asynchronously sync to backend if authenticated
     const token = localStorage.getItem('token');
-    const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
     if (token) {
       fetch(`${API_URL}/auth/profile`, {
         method: 'PUT',

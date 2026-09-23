@@ -4,8 +4,7 @@ import { Mail, Lock, User, ArrowRight, ShieldCheck, Loader2, Eye, EyeOff } from 
 import { motion, AnimatePresence } from 'framer-motion';
 import { UserContext } from '../contexts/UserContext';
 import { logActivity } from '../utils/activityLogger';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+import { API_URL } from '../utils/api';
 
 
 export default function Signup() {

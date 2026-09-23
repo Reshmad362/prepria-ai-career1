@@ -134,6 +134,7 @@ export default function CoursePlayer() {
   // Active Tab Time Tracking State
   const [timeSpentSeconds, setTimeSpentSeconds] = useState(0);
   const [isTabActive, setIsTabActive] = useState(!document.hidden);
+  const sessionIdRef = useRef(`sess_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`);
   const timeTrackingIntervalRef = useRef(null);
   const isTabActiveRef = useRef(!document.hidden);
   const progressRecordRef = useRef(progressRecord);
@@ -256,14 +257,16 @@ export default function CoursePlayer() {
         setTimeSpentSeconds(next);
         if (next % 5 === 0 && course?.id && currentStep.id) {
           const rec = progressRecordRef.current;
+          const hbId = `hb_${email}_${course.id}_${currentStep.id}_${next}_${sessionIdRef.current}`;
           const updated = {
             ...rec,
-            totalRequiredItems: totalRequiredItemsRef.current,
-            courseDefinition: courseProgressDefinitionRef.current,
-            lessonTimeSpent: {
-              ...(rec.lessonTimeSpent || {}),
-              [currentStep.id]: next
-            }
+            heartbeat: {
+              heartbeatId: hbId,
+              sessionId: sessionIdRef.current,
+              itemId: currentStep.id,
+              deltaSeconds: 5
+            },
+            lastAccessed: { moduleId: currentStep.moduleId, itemId: currentStep.id }
           };
           saveCourseProgressRecord(course.id, updated, email);
           progressRecordRef.current = updated;
@@ -369,7 +372,9 @@ export default function CoursePlayer() {
       answersByQuestionId[q.id] = quizAnswers[q.id];
     });
     const questionKey = questions.map(q => ({ id: q.id, correctIndex: q.correctIndex }));
+    const submissionId = `sub_${currentStep.id}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const quizSubmissionPayload = {
+      submissionId,
       quizId: currentStep.id,
       passingScore: passingThreshold,
       answersByQuestionId,

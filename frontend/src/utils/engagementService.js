@@ -33,9 +33,13 @@ export const recordLearningActivity = async ({
   };
 
   try {
+    const token = localStorage.getItem("token");
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
     const res = await fetch(`${API_BASE_URL}/analytics/activity/record`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(activityPayload)
     });
     if (res.ok) {
@@ -70,7 +74,9 @@ export const recordLearningActivity = async ({
 
 export const fetchEngagementMetrics = async (userId = 'guest') => {
   try {
-    const res = await fetch(`${API_BASE_URL}/analytics/engagement/${encodeURIComponent(userId)}`);
+    const token = localStorage.getItem("token");
+    const headers = token ? { "Authorization": `Bearer ${token}` } : {};
+    const res = await fetch(`${API_BASE_URL}/analytics/engagement/${encodeURIComponent(userId)}`, { headers });
     if (res.ok) {
       const result = await res.json();
       if (result.success && result.data) return result.data;
@@ -118,51 +124,56 @@ export const getCourseProgressRecord = (courseId, email = 'guest') => {
 };
 
 /**
+ * Fetch all course progress records for the candidate and populate localStorage.
+ * Restores all course states on Device B upon catalog or dashboard load.
+ */
+export const hydrateAllProgressFromBackend = async (email = 'guest') => {
+  if (!email || email === 'guest') return [];
+  try {
+    const token = localStorage.getItem("token");
+    const headers = token ? { "Authorization": `Bearer ${token}` } : {};
+    const res = await fetch(`${API_BASE_URL}/analytics/course/progress/${encodeURIComponent(email)}`, { headers });
+    if (!res.ok) return [];
+    const result = await res.json();
+    if (result.success && Array.isArray(result.data)) {
+      result.data.forEach(rec => {
+        if (rec && rec.courseId) {
+          try {
+            localStorage.setItem(`progress_${email}_${rec.courseId}`, JSON.stringify(rec));
+          } catch (e) {}
+        }
+      });
+      window.dispatchEvent(new Event("progressUpdated"));
+      return result.data;
+    }
+  } catch (e) {}
+  return [];
+};
+
+/**
  * Fetch progress from backend and merge with localStorage.
- * Merges by taking the union of completedItemIds and the latest quiz/assessment data.
  * Called on CoursePlayer mount to restore cross-device / post-logout progress.
  */
 export const hydrateProgressFromBackend = async (courseId, email = 'guest') => {
   if (!courseId || email === 'guest') return null;
   try {
+    const token = localStorage.getItem("token");
+    const headers = token ? { "Authorization": `Bearer ${token}` } : {};
     const res = await fetch(
-      `${API_BASE_URL}/analytics/course/progress/${encodeURIComponent(email)}/${encodeURIComponent(courseId)}`
+      `${API_BASE_URL}/analytics/course/progress/${encodeURIComponent(email)}/${encodeURIComponent(courseId)}`,
+      { headers }
     );
     if (!res.ok) return null;
     const result = await res.json();
     if (!result.success || !result.data) return null;
 
     const backendRecord = result.data;
-    const localRecord = getCourseProgressRecord(courseId, email);
-
-    // Security: backend is the source of truth for completions/quiz outcomes/final.
-    // localStorage must not be able to “unlock” modules after logout/login.
-    const mergedCompleted = backendRecord.completedItemIds || [];
-    const mergedQuizScores = backendRecord.quizScores || {};
-    const mergedFinal = backendRecord.finalAssessment || null;
-
-    // Lesson time can be merged (take MAX per lesson).
-    const mergedTimeSpent = { ...(localRecord.lessonTimeSpent || {}), ...(backendRecord.lessonTimeSpent || {}) };
-    Object.entries(backendRecord.lessonTimeSpent || {}).forEach(([lid, bTime]) => {
-      const lTime = localRecord.lessonTimeSpent?.[lid] || 0;
-      mergedTimeSpent[lid] = Math.max(bTime, lTime);
-    });
-
-    const merged = {
-      ...localRecord,
-      completedItemIds: mergedCompleted,
-      quizScores: mergedQuizScores,
-      lessonTimeSpent: mergedTimeSpent,
-      finalAssessment: mergedFinal,
-      lastAccessed: backendRecord.lastAccessed || localRecord.lastAccessed
-    };
-
-    // Save merged back to localStorage
     try {
-      localStorage.setItem(`progress_${email}_${courseId}`, JSON.stringify(merged));
+      localStorage.setItem(`progress_${email}_${courseId}`, JSON.stringify(backendRecord));
+      window.dispatchEvent(new Event("progressUpdated"));
     } catch (e) {}
 
-    return merged;
+    return backendRecord;
   } catch (e) {
     return null;
   }
@@ -176,9 +187,13 @@ export const saveCourseProgressRecord = async (courseId, progressData, email = '
     window.dispatchEvent(new Event("progressUpdated"));
 
     // Request server-side validation.
+    const token = localStorage.getItem("token");
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
     const res = await fetch(`${API_BASE_URL}/analytics/course/progress`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({
         user_id: email,
         course_id: courseId,
@@ -207,8 +222,11 @@ export const saveCourseProgressRecord = async (courseId, progressData, email = '
 export const validateCertificateBackend = async (courseId, email = 'guest') => {
   if (!courseId || email === 'guest') return { eligible: false, reason: "Not authenticated." };
   try {
+    const token = localStorage.getItem("token");
+    const headers = token ? { "Authorization": `Bearer ${token}` } : {};
     const res = await fetch(
-      `${API_BASE_URL}/analytics/course/certificate/${encodeURIComponent(email)}/${encodeURIComponent(courseId)}`
+      `${API_BASE_URL}/analytics/course/certificate/${encodeURIComponent(email)}/${encodeURIComponent(courseId)}`,
+      { headers }
     );
     if (!res.ok) return { eligible: false, reason: "Backend validation failed." };
     const result = await res.json();

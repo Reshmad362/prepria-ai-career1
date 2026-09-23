@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { coursesData } from '../data/coursesData';
 import { logActivity } from '../utils/activityLogger';
+import { API_URL } from '../utils/api';
 
 export default function DocumentCenter() {
   const navigate = useNavigate();
@@ -30,7 +31,10 @@ export default function DocumentCenter() {
         return;
       }
       setLoading(true);
-      const response = await fetch(`http://localhost:8000/documents/list/${activeEmail}`);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/documents/list/${encodeURIComponent(activeEmail)}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
@@ -94,8 +98,10 @@ export default function DocumentCenter() {
 
     setUploading(true);
     try {
-      const response = await fetch('http://localhost:8000/documents/upload', {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/documents/upload`, {
         method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         body: formData,
       });
       const result = await response.json();
@@ -122,8 +128,10 @@ export default function DocumentCenter() {
   const handleDelete = async (docId) => {
     if (!confirm("Are you sure you want to remove this document?")) return;
     try {
-      const response = await fetch(`http://localhost:8000/documents/${activeEmail}/${docId}`, {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/documents/${encodeURIComponent(activeEmail)}/${encodeURIComponent(docId)}`, {
         method: 'DELETE',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       const result = await response.json();
       if (result.success) {

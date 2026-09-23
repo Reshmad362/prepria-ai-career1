@@ -4,27 +4,274 @@
     "courseId": "course-test-1",
     "completedItemIds": [
       "l1",
+      "l2",
       "q1"
     ],
     "quizScores": {
       "q1": {
         "score": 100,
-        "passed": true
+        "passed": true,
+        "attempts": 1,
+        "validated": true
       }
     },
     "finalAssessment": {
       "passed": true,
-      "score": 80
+      "score": 100,
+      "attempts": 1,
+      "validated": true,
+      "completedAt": null
     },
     "lessonTimeSpent": {
       "l1": 60,
-      "l2": 59,
-      "q1": 40
+      "l2": 60,
+      "q1": 30
     },
     "lastAccessed": {},
     "totalRequiredItems": 3,
-    "completionPercentage": 66,
+    "completionPercentage": 100,
+    "certificateEligible": true,
+    "updatedAt": "2026-08-19T16:44:08.222234"
+  },
+  "reshmad362@gmail.com_tech-102": {
+    "userId": "reshmad362@gmail.com",
+    "courseId": "tech-102",
+    "completedItemIds": [],
+    "quizScores": {},
+    "finalAssessment": {},
+    "lessonTimeSpent": {},
+    "lastAccessed": {
+      "moduleId": "tech-102-mod-1",
+      "itemId": "tech-102-m1-l1"
+    },
+    "totalRequiredItems": 6,
+    "completionPercentage": 0,
     "certificateEligible": false,
-    "updatedAt": "2026-08-19T16:44:08.217481"
+    "processedHeartbeatIds": [],
+    "processedQuizSubmissionIds": [],
+    "updatedAt": "2026-09-23T08:58:11.824456"
+  },
+  "reshmad362@gmail.com_devops-113": {
+    "userId": "reshmad362@gmail.com",
+    "courseId": "devops-113",
+    "completedItemIds": [],
+    "quizScores": {},
+    "finalAssessment": {},
+    "lessonTimeSpent": {},
+    "lastAccessed": {
+      "moduleId": "devops-113-mod-1",
+      "itemId": "devops-113-m1-l1"
+    },
+    "totalRequiredItems": 6,
+    "completionPercentage": 0,
+    "certificateEligible": false,
+    "processedHeartbeatIds": [],
+    "processedQuizSubmissionIds": [],
+    "updatedAt": "2026-09-23T08:58:58.138679"
+  },
+  "reshmad362@gmail.com_fe-101": {
+    "userId": "reshmad362@gmail.com",
+    "courseId": "fe-101",
+    "completedItemIds": [],
+    "quizScores": {},
+    "finalAssessment": {},
+    "lessonTimeSpent": {},
+    "lastAccessed": {
+      "moduleId": "fe-101-mod-1",
+      "itemId": "fe-101-m1-l1"
+    },
+    "totalRequiredItems": 6,
+    "completionPercentage": 0,
+    "certificateEligible": false,
+    "processedHeartbeatIds": [],
+    "processedQuizSubmissionIds": [],
+    "updatedAt": "2026-09-23T09:05:20.713061"
+  },
+  "learner_a@prepria.com_devops-foundations": {
+    "userId": "learner_a@prepria.com",
+    "courseId": "devops-foundations",
+    "completedItemIds": [
+      "devops-mod1-les1",
+      "devops-mod1-les2",
+      "devops-mod1-quiz",
+      "devops-mod2-les1",
+      "devops-mod2-les2",
+      "devops-mod2-quiz"
+    ],
+    "quizScores": {
+      "devops-mod1-quiz": {
+        "score": 100,
+        "passed": true,
+        "attempts": 3,
+        "validated": true,
+        "lastAttemptScore": 0
+      },
+      "devops-mod2-quiz": {
+        "score": 100,
+        "passed": true,
+        "attempts": 1,
+        "validated": true,
+        "lastAttemptScore": 100
+      }
+    },
+    "finalAssessment": {
+      "score": 100,
+      "passed": true,
+      "attempts": 1,
+      "validated": true,
+      "lastAttemptScore": 100,
+      "completedAt": "2026-09-23T09:25:26.896354"
+    },
+    "lessonTimeSpent": {
+      "devops-mod1-les1": 65,
+      "devops-mod1-les2": 60,
+      "devops-mod2-les1": 60,
+      "devops-mod2-les2": 60
+    },
+    "lastAccessed": {},
+    "totalRequiredItems": 6,
+    "completionPercentage": 100,
+    "certificateEligible": true,
+    "processedHeartbeatIds": [
+      "hb_fill_devops-mod1-les1_0",
+      "hb_fill_devops-mod1-les1_1",
+      "hb_fill_devops-mod1-les1_10",
+      "hb_fill_devops-mod1-les1_11",
+      "hb_fill_devops-mod1-les1_2",
+      "hb_fill_devops-mod1-les1_3",
+      "hb_fill_devops-mod1-les1_4",
+      "hb_fill_devops-mod1-les1_5",
+      "hb_fill_devops-mod1-les1_6",
+      "hb_fill_devops-mod1-les1_7",
+      "hb_fill_devops-mod1-les1_8",
+      "hb_fill_devops-mod1-les1_9",
+      "hb_fill_devops-mod1-les2_0",
+      "hb_fill_devops-mod1-les2_1",
+      "hb_fill_devops-mod1-les2_10",
+      "hb_fill_devops-mod1-les2_11",
+      "hb_fill_devops-mod1-les2_2",
+      "hb_fill_devops-mod1-les2_3",
+      "hb_fill_devops-mod1-les2_4",
+      "hb_fill_devops-mod1-les2_5",
+      "hb_fill_devops-mod1-les2_6",
+      "hb_fill_devops-mod1-les2_7",
+      "hb_fill_devops-mod1-les2_8",
+      "hb_fill_devops-mod1-les2_9",
+      "hb_fill_devops-mod2-les1_0",
+      "hb_fill_devops-mod2-les1_1",
+      "hb_fill_devops-mod2-les1_10",
+      "hb_fill_devops-mod2-les1_11",
+      "hb_fill_devops-mod2-les1_2",
+      "hb_fill_devops-mod2-les1_3",
+      "hb_fill_devops-mod2-les1_4",
+      "hb_fill_devops-mod2-les1_5",
+      "hb_fill_devops-mod2-les1_6",
+      "hb_fill_devops-mod2-les1_7",
+      "hb_fill_devops-mod2-les1_8",
+      "hb_fill_devops-mod2-les1_9",
+      "hb_fill_devops-mod2-les2_0",
+      "hb_fill_devops-mod2-les2_1",
+      "hb_fill_devops-mod2-les2_10",
+      "hb_fill_devops-mod2-les2_11",
+      "hb_fill_devops-mod2-les2_2",
+      "hb_fill_devops-mod2-les2_3",
+      "hb_fill_devops-mod2-les2_4",
+      "hb_fill_devops-mod2-les2_5",
+      "hb_fill_devops-mod2-les2_6",
+      "hb_fill_devops-mod2-les2_7",
+      "hb_fill_devops-mod2-les2_8",
+      "hb_fill_devops-mod2-les2_9",
+      "hb_test_1"
+    ],
+    "processedQuizSubmissionIds": [
+      "sub_final_exam_pass",
+      "sub_quiz_mod1_attempt_1",
+      "sub_quiz_mod1_attempt_2",
+      "sub_quiz_mod1_attempt_3",
+      "sub_quiz_mod2_pass"
+    ],
+    "updatedAt": "2026-09-23T09:25:26.896415"
+  },
+  "learner_b@prepria.com_react-mastery": {
+    "userId": "learner_b@prepria.com",
+    "courseId": "react-mastery",
+    "completedItemIds": [],
+    "quizScores": {},
+    "finalAssessment": {},
+    "lessonTimeSpent": {
+      "react-mod1-les1": 25,
+      "react-mod1-les2": 20
+    },
+    "lastAccessed": {},
+    "totalRequiredItems": 3,
+    "completionPercentage": 0,
+    "certificateEligible": false,
+    "processedHeartbeatIds": [
+      "hb_devA_les1_0",
+      "hb_devA_les1_1",
+      "hb_devA_les1_2",
+      "hb_devA_les1_3",
+      "hb_devA_les1_4",
+      "hb_devB_les2_0",
+      "hb_devB_les2_1",
+      "hb_devB_les2_2",
+      "hb_devB_les2_3"
+    ],
+    "processedQuizSubmissionIds": [],
+    "updatedAt": "2026-09-23T09:25:27.145874"
+  },
+  "fe101_learner@prepria.com_fe-101": {
+    "userId": "fe101_learner@prepria.com",
+    "courseId": "fe-101",
+    "completedItemIds": [
+      "fe-101-m1-l1"
+    ],
+    "quizScores": {},
+    "finalAssessment": {},
+    "lessonTimeSpent": {
+      "fe-101-m1-l1": 65
+    },
+    "lastAccessed": {},
+    "totalRequiredItems": 40,
+    "completionPercentage": 2,
+    "certificateEligible": false,
+    "processedHeartbeatIds": [
+      "hb_fe101_0",
+      "hb_fe101_1",
+      "hb_fe101_10",
+      "hb_fe101_11",
+      "hb_fe101_12",
+      "hb_fe101_2",
+      "hb_fe101_3",
+      "hb_fe101_4",
+      "hb_fe101_5",
+      "hb_fe101_6",
+      "hb_fe101_7",
+      "hb_fe101_8",
+      "hb_fe101_9"
+    ],
+    "processedQuizSubmissionIds": [],
+    "updatedAt": "2026-09-23T09:25:27.492062"
+  },
+  "under_dwell_user@prepria.com_fe-101": {
+    "userId": "under_dwell_user@prepria.com",
+    "courseId": "fe-101",
+    "completedItemIds": [],
+    "quizScores": {},
+    "finalAssessment": {},
+    "lessonTimeSpent": {
+      "fe-101-m1-l1": 15
+    },
+    "lastAccessed": {},
+    "totalRequiredItems": 40,
+    "completionPercentage": 0,
+    "certificateEligible": false,
+    "processedHeartbeatIds": [
+      "hb_under_0",
+      "hb_under_1",
+      "hb_under_2"
+    ],
+    "processedQuizSubmissionIds": [],
+    "updatedAt": "2026-09-23T09:25:27.561424"
   }
 }

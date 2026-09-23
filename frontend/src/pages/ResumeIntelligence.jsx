@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { logActivity } from '../utils/activityLogger';
 import { sendEmailNotification } from '../utils/emailApi';
+import { API_URL } from '../utils/api';
 
 export default function ResumeIntelligence() {
   const [dragActive, setDragActive] = useState(false);
@@ -94,7 +95,7 @@ export default function ResumeIntelligence() {
       formData.append('file', fileToUpload);
       
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:8000/upload-resume', {
+      const response = await fetch(`${API_URL}/upload-resume`, {
         method: 'POST',
         headers: token ? { 'Authorization': `Bearer ${token}` } : {},
         body: formData
@@ -129,7 +130,6 @@ export default function ResumeIntelligence() {
           localStorage.setItem(`atsData_${userEmail}`, JSON.stringify(newAtsData));
         }
 
-        const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
         if (token) {
           fetch(`${API_URL}/auth/profile`, {
             method: 'PUT',

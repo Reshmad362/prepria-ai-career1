@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Key, Shield, Smartphone, Eye, EyeOff, CheckCircle, AlertCircle } from 'lucide-react';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+import { API_URL } from '../utils/api';
 
 export default function AccountSecurityCard({ user }) {
   const email = user?.email || '';

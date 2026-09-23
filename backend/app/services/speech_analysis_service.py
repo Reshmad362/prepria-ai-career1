@@ -34,6 +34,9 @@ def analyze_speech(text: str, duration_seconds: int) -> dict:
         0,
         100 - (filler_count * 5) - (pause_count * 2) - (long_pauses * 5)
     )
+    
+    words = len(text.strip().split()) if text.strip() else 0
+    wpm = round((words / (duration_seconds / 60.0)), 1) if duration_seconds > 0 else 0
         
     return {
         "filler_count": filler_count,
@@ -41,6 +44,9 @@ def analyze_speech(text: str, duration_seconds: int) -> dict:
         "pause_count": pause_count,
         "long_pauses": long_pauses,
         "max_pause_duration": pause_data["max_pause_duration"],
-        "fluency_score": int(fluency_score)
+        "fluency_score": int(fluency_score),
+        "wpm": wpm,
+        "words": words,
+        "duration_seconds": duration_seconds
     }
 

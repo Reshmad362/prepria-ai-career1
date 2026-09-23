@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { UserContext } from '../contexts/UserContext';
 import { logActivity, logNotification } from '../utils/activityLogger';
 import { sendEmailNotification } from '../utils/emailApi';
+import { API_URL } from '../utils/api';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import Badge from '../components/Badge';
@@ -81,8 +82,6 @@ export default function MockInterview() {
     
     window.speechSynthesis.speak(utterance);
   };
-
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
   const generateNextQuestion = async (isFollowUp = false) => {
     try {

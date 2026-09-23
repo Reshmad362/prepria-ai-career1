@@ -8,6 +8,7 @@ import {
   Video, FileText, Check, AlertCircle, HelpCircle, ChevronRight, RefreshCw, Zap
 } from 'lucide-react';
 import { logActivity } from '../utils/activityLogger';
+import { API_URL } from '../utils/api';
 
 const DOMAIN_TOPICS = {
   'Technology': ['React', 'Node.js', 'Python', 'Java', 'SQL', 'System Design', 'Data Structures & Algorithms', 'Docker', 'AWS / Cloud', 'TypeScript'],
@@ -138,7 +139,6 @@ export default function Preferences() {
     }
 
     const token = localStorage.getItem('token');
-    const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
     if (token) {
       fetch(`${API_URL}/auth/profile`, {
         method: 'PUT',

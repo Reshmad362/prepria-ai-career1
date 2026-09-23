@@ -1,6 +1,25 @@
 // frontend/src/utils/api.js
-export const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+export const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
+export const getAuthHeaders = (includeJson = true) => {
+  const headers = {};
+  if (includeJson) {
+    headers["Content-Type"] = "application/json";
+  }
+  const token = localStorage.getItem("token");
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
+};
+
+export const authenticatedFetch = async (url, options = {}) => {
+  const headers = {
+    ...getAuthHeaders(options.body && !(options.body instanceof FormData)),
+    ...(options.headers || {})
+  };
+  return fetch(url, { ...options, headers });
+};
 
 export const generateQuestions = async (role, difficulty, questionCount) => {
   const response = await fetch(`${API_URL}/generate-interview`, {

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Mic, Square, Play, RefreshCw, AlertCircle, Video } from 'lucide-react';
+import { API_URL } from '../utils/api';
 
 const VideoRecorder = ({ onTranscription, onEmotionUpdate, onRecordingComplete }) => {
   const [stream, setStream] = useState(null);
@@ -94,7 +95,7 @@ const VideoRecorder = ({ onTranscription, onEmotionUpdate, onRecordingComplete }
     const base64Image = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
     
     try {
-      const res = await fetch('http://127.0.0.1:8000/emotion-detection', {
+      const res = await fetch(`${API_URL}/emotion-detection`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ base64_image: base64Image })
@@ -156,7 +157,7 @@ const VideoRecorder = ({ onTranscription, onEmotionUpdate, onRecordingComplete }
     try {
       const formData = new FormData();
       formData.append("file", blob);
-      const response = await fetch("http://127.0.0.1:8000/transcribe", {
+      const response = await fetch(`${API_URL}/transcribe`, {
         method: "POST",
         body: formData
       });

@@ -9,6 +9,7 @@ import {
   Award, TrendingUp, RefreshCw, ChevronRight, HelpCircle
 } from 'lucide-react';
 import { INTERVIEW_ROLES_CATALOG, getQuestionsForRole } from '../utils/interviewQuestionEngine';
+import { API_URL } from '../utils/api';
 
 export default function RoleInterviews() {
   const navigate = useNavigate();
@@ -36,11 +37,37 @@ export default function RoleInterviews() {
   const [interviewHistory, setInterviewHistory] = useState([]);
 
   useEffect(() => {
-    try {
-      const historyKey = `interview_history_${activeEmail}`;
-      const saved = JSON.parse(localStorage.getItem(historyKey) || '[]');
-      setInterviewHistory(saved);
-    } catch (e) {}
+    const fetchHistory = async () => {
+      // 1. Try backend authenticated history first
+      try {
+        const token = localStorage.getItem('token');
+        if (token && activeEmail && activeEmail !== 'guest') {
+          const resp = await fetch(`${API_URL}/interview/history/${encodeURIComponent(activeEmail)}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          if (resp.ok) {
+            const result = await resp.json();
+            if (result && result.data && Array.isArray(result.data)) {
+              setInterviewHistory(result.data);
+              return;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to fetch interview history from backend, falling back to local storage:", err);
+      }
+
+      // 2. Fallback to localStorage
+      try {
+        const historyKey = `interview_history_${activeEmail}`;
+        const saved = JSON.parse(localStorage.getItem(historyKey) || '[]');
+        setInterviewHistory(saved);
+      } catch (e) {}
+    };
+
+    fetchHistory();
   }, [activeEmail]);
 
   // Find Recommended Role
@@ -97,11 +124,48 @@ export default function RoleInterviews() {
   };
 
   // Launch AI Interview
-  const handleLaunchInterview = () => {
+  const handleLaunchInterview = async () => {
     if (!selectedRoleForSetup) return;
 
     const roleName = selectedRoleForSetup.name;
-    const generatedQuestions = getQuestionsForRole(roleName, difficulty, interviewType, questionCount);
+    let finalQuestions = getQuestionsForRole(roleName, difficulty, interviewType, questionCount);
+
+    // If authenticated, attempt adaptive question generation targeting authentic candidate weaknesses
+    try {
+      const token = localStorage.getItem('token');
+      if (token) {
+        const adaptiveResp = await fetch(`${API_URL}/api/interview/generate-adaptive`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            role: roleName,
+            difficulty: difficulty.toLowerCase(),
+            question_count: questionCount
+          })
+        });
+
+        if (adaptiveResp.ok) {
+          const adaptiveData = await adaptiveResp.json();
+          if (adaptiveData && Array.isArray(adaptiveData.questions) && adaptiveData.questions.length > 0) {
+            finalQuestions = adaptiveData.questions.map((q, idx) => ({
+              id: `q-${idx + 1}`,
+              question: q.question,
+              topic: q.topic || "General",
+              difficulty: q.difficulty || difficulty,
+              type: q.type || interviewType,
+              isTargetedRemediation: q.isTargetedRemediation || false,
+              targetedWeakness: q.targetedWeakness || null,
+              modelAnswerGuidelines: q.modelAnswerGuidelines || q.question
+            }));
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Adaptive interview generation fell back to client catalog:", err);
+    }
 
     const config = {
       roleId: selectedRoleForSetup.id,
@@ -113,7 +177,7 @@ export default function RoleInterviews() {
       questionCount: questionCount,
       interviewMode: interviewMode,
       durationMinutes: questionCount * 2.5,
-      questions: generatedQuestions,
+      questions: finalQuestions,
       userSkills: userSkills,
       createdAt: new Date().toISOString()
     };

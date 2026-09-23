@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Clock, BookOpen, ChevronLeft, Award, PlayCircle, ChevronDown, 
@@ -6,7 +6,7 @@ import {
   ExternalLink, Layers, Code2, Check, Sparkles, AlertTriangle, Video, HelpCircle
 } from 'lucide-react';
 import { coursesData } from '../data/coursesData';
-import { getCourseActionState } from '../utils/engagementService';
+import { getCourseActionState, hydrateProgressFromBackend } from '../utils/engagementService';
 import { UserContext } from '../contexts/UserContext';
 
 export default function CourseDetail() {
@@ -17,6 +17,15 @@ export default function CourseDetail() {
   
   const course = coursesData.find(c => String(c.id).toLowerCase() === String(courseId).toLowerCase());
   const [expandedModule, setExpandedModule] = useState(0);
+  const [progressVersion, setProgressVersion] = useState(0);
+
+  useEffect(() => {
+    if (course?.id && email && email !== 'guest') {
+      hydrateProgressFromBackend(course.id, email).then(() => {
+        setProgressVersion(v => v + 1);
+      });
+    }
+  }, [course?.id, email]);
 
   if (!course) {
     return (

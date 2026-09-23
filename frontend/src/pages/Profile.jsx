@@ -5,6 +5,7 @@ import Card from '../components/Card';
 import Button from '../components/Button';
 import Badge from '../components/Badge';
 import { logActivity } from '../utils/activityLogger';
+import { API_URL } from '../utils/api';
 import { 
   User, Mail, Briefcase, CheckCircle2, Award, Target, FileText, Activity, 
   MessageSquare, Edit3, X, Smartphone, MapPin, Files, Loader2, ArrowRight, 
@@ -97,7 +98,6 @@ export default function Profile() {
       if (!isEditing) {
         updateProfile({ picture: dataUrl });
         const token = localStorage.getItem('token');
-        const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
         if (token) {
           fetch(`${API_URL}/auth/profile`, {
             method: 'PUT',
@@ -136,7 +136,6 @@ export default function Profile() {
     setSaveMessage(null);
 
     const token = localStorage.getItem('token');
-    const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
 
     const updatedProfile = {
       ...profile,
