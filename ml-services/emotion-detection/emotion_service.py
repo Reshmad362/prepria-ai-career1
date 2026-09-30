@@ -1,5 +1,4 @@
 from typing import Dict, Any
-import random
 import base64
 import re
 
@@ -67,32 +66,45 @@ def detect_emotion(base64_image: str = None) -> Dict[str, Any]:
             }
 
         # Quality Tracking: Lighting (mean intensity)
-        mean_brightness = np.mean(gray)
+        mean_brightness = float(np.mean(gray))
         lighting = "Good"
         if mean_brightness < 50:
-            lighting = "Poor (Dark)"
+            lighting = "Poor"
         elif mean_brightness > 200:
-            lighting = "Poor (Overexposed)"
+            lighting = "Poor"
 
         # Quality Tracking: Blur/Sharpness (Laplacian Variance)
-        variance = cv2.Laplacian(gray, cv2.CV_64F).var()
+        variance = float(cv2.Laplacian(gray, cv2.CV_64F).var())
         frame_qual = "Sharp"
         if variance < 100:  # Threshold for blurriness
-            frame_qual = "Poor (Blurry)"
+            frame_qual = "Poor"
 
-        # For this logic block, we assign a randomized contextual emotion since
-        # we don't have a Keras CNN locally connected in this specific file,
-        # but the face tracking fundamentally solves the "No Face" issue.
-        emotions = ["Happy", "Neutral", "Nervous", "Confident"]
-        emotion = random.choice(emotions)
+        # Deterministic visual engagement signal:
+        # Note: True emotion classification requires a validated neural classifier (CNN).
+        # In this CV2 Haar pipeline, we provide deterministic facial presence and visual engagement signals.
+        if multiple_faces:
+            emotion = "Multiple Faces"
+            visual_signal = "Multiple Faces Detected in Frame"
+            confidence = 0.75
+        elif face_detected:
+            emotion = "Neutral"
+            visual_signal = "Single Face Centered and Attentive"
+            confidence = 0.90 if frame_qual == "Sharp" and lighting == "Good" else 0.70
+        else:
+            emotion = "No Face"
+            visual_signal = "No Face Detected"
+            confidence = 0.0
 
         return {
             "emotion": emotion,
-            "confidence": round(random.uniform(0.75, 0.98), 2),
+            "confidence": confidence,
             "face_detected": face_detected,
             "multiple_faces": multiple_faces,
             "lighting_quality": lighting,
-            "frame_quality": frame_qual
+            "frame_quality": frame_qual,
+            "visual_signal": visual_signal,
+            "brightness_level": round(mean_brightness, 1),
+            "sharpness_variance": round(variance, 1)
         }
 
     except Exception as e:

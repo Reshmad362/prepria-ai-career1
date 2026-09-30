@@ -8,7 +8,7 @@ import {
   PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import { TrendingUp, Target, BrainCircuit, Activity, BarChart2, Briefcase } from 'lucide-react';
-import { API_URL } from '../utils/api';
+import { API_URL, getLongitudinalProfile } from '../utils/api';
 
 const COLORS = ['#E97862', '#22C55E', '#3B82F6', '#8B5CF6', '#F59E0B'];
 
@@ -19,6 +19,7 @@ export default function Scorecard() {
   const [error, setError] = useState(null);
   const [analytics, setAnalytics] = useState(null);
   const [growth, setGrowth] = useState(null);
+  const [longitudinal, setLongitudinal] = useState(null);
   const [activities, setActivities] = useState([]);
 
   useEffect(() => {
@@ -36,27 +37,32 @@ export default function Scorecard() {
         const token = localStorage.getItem('token');
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-        const [dashRes, growthRes, actRes] = await Promise.all([
+        const [dashRes, growthRes, actRes, longRes] = await Promise.allSettled([
           fetch(`${API_URL}/analytics/dashboard/${encodeURIComponent(authKey)}`, { headers }),
           fetch(`${API_URL}/analytics/growth/${encodeURIComponent(authKey)}`, { headers }),
-          fetch(`${API_URL}/analytics/activity/${encodeURIComponent(authKey)}`, { headers })
+          fetch(`${API_URL}/analytics/activity/${encodeURIComponent(authKey)}`, { headers }),
+          getLongitudinalProfile()
         ]);
 
-        if (dashRes.ok) {
-          const dashJson = await dashRes.json();
+        if (dashRes.status === 'fulfilled' && dashRes.value.ok) {
+          const dashJson = await dashRes.value.json();
           if (dashJson.success) setAnalytics(dashJson.data);
         }
 
-        if (growthRes.ok) {
-          const growthJson = await growthRes.json();
+        if (growthRes.status === 'fulfilled' && growthRes.value.ok) {
+          const growthJson = await growthRes.value.json();
           if (growthJson.success) setGrowth(growthJson.data);
         }
 
-        if (actRes.ok) {
-          const actJson = await actRes.json();
+        if (actRes.status === 'fulfilled' && actRes.value.ok) {
+          const actJson = await actRes.value.json();
           if (actJson.success && Array.isArray(actJson.data)) {
             setActivities(actJson.data);
           }
+        }
+
+        if (longRes.status === 'fulfilled' && longRes.value?.success && longRes.value?.data) {
+          setLongitudinal(longRes.value.data);
         }
       } catch (err) {
         console.error("Scorecard fetch error:", err);
@@ -273,6 +279,100 @@ export default function Scorecard() {
           </div>
         </Card>
       </div>
+
+      {/* Longitudinal Skill Intelligence & Mastery Breakdown (Phase 9) */}
+      {longitudinal && (
+        <Card className="border-0 shadow-lg p-6 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 dark:border-gray-800 pb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-extrabold uppercase tracking-wider text-primary">
+                  Longitudinal Intelligence Engine
+                </span>
+                <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+                  longitudinal.trend === 'improving' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400' :
+                  longitudinal.trend === 'declining' ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400' :
+                  'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+                }`}>
+                  Trajectory: {longitudinal.trend === 'improving' ? 'Improving' : longitudinal.trend === 'declining' ? 'Declining' : longitudinal.trend === 'steady' ? 'Steady' : 'Insufficient Evidence'}
+                </span>
+              </div>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mt-1">
+                Multi-Session Mastery &amp; Weakness Evolution
+              </h2>
+            </div>
+            {longitudinal.totalInterviews > 1 && (
+              <div className="text-xs font-bold px-3 py-1.5 rounded-xl bg-primary/10 text-primary self-start sm:self-auto">
+                Delta: {longitudinal.scoreDelta >= 0 ? `+${longitudinal.scoreDelta}` : longitudinal.scoreDelta} pts ({longitudinal.totalInterviews} sessions)
+              </div>
+            )}
+          </div>
+
+          {longitudinal.totalInterviews === 0 ? (
+            <div className="p-6 text-center border border-dashed border-gray-200 dark:border-gray-800 rounded-2xl">
+              <p className="text-xs text-gray-500 font-medium">
+                No multi-session interview history recorded yet. Complete sequential mock interviews to track recurring weaknesses, intervention outcomes, and topic mastery states.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Recurring / Persistent Weaknesses */}
+              <div className="p-4 rounded-2xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200/60 dark:border-rose-900/30 space-y-2">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-600 dark:text-rose-400 block">
+                  Recurring Weaknesses ({longitudinal.recurringWeaknesses?.length || 0})
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {longitudinal.recurringWeaknesses?.length > 0 ? (
+                    longitudinal.recurringWeaknesses.map((w, i) => (
+                      <span key={i} className="text-xs font-semibold px-2 py-0.5 rounded-md bg-white dark:bg-gray-800 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/40">
+                        {w.topic} ({w.occurrenceCount}x)
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-xs text-gray-500 font-medium">No recurring weaknesses detected</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Resolved Weaknesses */}
+              <div className="p-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-900/30 space-y-2">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block">
+                  Resolved Weaknesses ({longitudinal.resolvedWeaknesses?.length || 0})
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {longitudinal.resolvedWeaknesses?.length > 0 ? (
+                    longitudinal.resolvedWeaknesses.map((w, i) => (
+                      <span key={i} className="text-xs font-semibold px-2 py-0.5 rounded-md bg-white dark:bg-gray-800 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40">
+                        {w.topic} ({w.resolvedScore}%)
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-xs text-gray-500 font-medium">No resolved weaknesses yet</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Consistent Strengths */}
+              <div className="p-4 rounded-2xl bg-purple-50/60 dark:bg-purple-950/20 border border-purple-200/60 dark:border-purple-900/30 space-y-2">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-600 dark:text-purple-400 block">
+                  Demonstrated Strengths ({longitudinal.strengths?.length || 0})
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {longitudinal.strengths?.length > 0 ? (
+                    longitudinal.strengths.map((s, i) => (
+                      <span key={i} className="text-xs font-semibold px-2 py-0.5 rounded-md bg-white dark:bg-gray-800 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-900/40">
+                        {s.topic} ({s.averageScore}%)
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-xs text-gray-500 font-medium">Take more rounds to identify strengths</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
 
     </div>
   );

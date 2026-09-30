@@ -9,27 +9,29 @@
 
 PREPRIA is architected as a decoupled, multi-tier intelligence platform comprising:
 1. **Frontend Client:** React 19 SPA built with Vite, TailwindCSS, Framer Motion, Lucide icons, and Recharts.
-2. **Backend API Gateway & Business Services:** Python FastAPI REST server providing authentication, ATS processing, question generation, course progress validation, analytics aggregation, and job matching.
-3. **ML / Intelligence Services:** Python-based evaluation engines encompassing semantic text similarity (`sentence_transformers`), CV2 face/quality monitoring (`OpenCV`), speech pause/filler detection, and Whisper audio transcription.
-4. **Data Persistence Layer:** JSON-backed file database (`users.json`, `course_progress.json`, `activities.json`) with backup (`.bak`) and atomic temporary write protections, designed for transition to relational SQL/PostgreSQL in production.
+2. **Backend API Gateway & Business Services:** Python FastAPI REST server providing authentication, ATS processing, question generation, course progress validation, analytics aggregation, job matching, personalized recommendation intelligence, and longitudinal mastery tracking.
+3. **ML / Intelligence Services:** Python-based evaluation engines encompassing semantic text similarity, deterministic CV2 face/quality monitoring (`OpenCV`), speech pause/filler detection, and Whisper audio transcription.
+4. **Data Persistence Layer:** JSON-backed file database (`users.json`, `course_progress.json`, `activities.json`, `interview_history.json`, `recommendations.json`) with backup (`.bak`) and atomic temporary write protections, designed for transition to relational SQL/PostgreSQL in production.
 
 ```mermaid
 graph TD
     A[React 19 Frontend SPA] -->|REST / Bearer JWT| B[FastAPI Backend :8000]
     B --> C[Auth & Profile Service]
     B --> D[Resume & ATS Engine]
-    B --> E[Interview & Question Engine]
+    B --> E[Dynamic Interview & Question Engine]
     B --> F[Engagement & Course Service]
     B --> G[Job Matching Service]
-    B --> H[Longitudinal Analytics Engine]
+    B --> H[Recommendation Engine]
+    B --> I[Longitudinal Intelligence Engine]
     
-    D --> I[PDF/Docx Text & Skill Extractor]
-    E --> J[NLP Evaluation / ML Service]
-    E --> K[Speech & Emotion Detection ML]
+    D --> J[PDF/Docx Text & Skill Extractor]
+    E --> K[NLP Semantic Evaluation Service]
+    E --> L[Speech Fluency & Deterministic CV2 Quality]
     
-    C --> L[(users.json)]
-    F --> M[(course_progress.json)]
-    H --> N[(activities.json)]
+    C --> M[(users.json)]
+    F --> N[(course_progress.json)]
+    H --> O[(recommendations.json)]
+    I --> P[(interview_history.json & activities.json)]
 ```
 
 ---

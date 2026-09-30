@@ -54,3 +54,39 @@ export const generateDynamicQuestions = async (role, interviewNumber = 1, count 
   return await response.json();
 };
 
+export const getRecommendations = async (status = null) => {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  const response = await authenticatedFetch(`${API_URL}/recommendations${query}`, {
+    method: "GET"
+  });
+  if (!response.ok) throw new Error("Failed to fetch recommendations");
+  return await response.json();
+};
+
+export const updateRecommendationStatus = async (recommendationId, status) => {
+  const response = await authenticatedFetch(`${API_URL}/recommendations/${encodeURIComponent(recommendationId)}/status`, {
+    method: "PUT",
+    body: JSON.stringify({ status })
+  });
+  if (!response.ok) throw new Error("Failed to update recommendation status");
+  return await response.json();
+};
+
+export const getLongitudinalProfile = async (targetRole = null) => {
+  const query = targetRole ? `?target_role=${encodeURIComponent(targetRole)}` : "";
+  const response = await authenticatedFetch(`${API_URL}/longitudinal/profile${query}`, {
+    method: "GET"
+  });
+  if (!response.ok) throw new Error("Failed to fetch longitudinal profile");
+  return await response.json();
+};
+
+export const getTopicLongitudinalDetail = async (topic) => {
+  const response = await authenticatedFetch(`${API_URL}/longitudinal/topic/${encodeURIComponent(topic)}`, {
+    method: "GET"
+  });
+  if (!response.ok) throw new Error("Failed to fetch topic longitudinal detail");
+  return await response.json();
+};
+
+

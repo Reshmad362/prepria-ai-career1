@@ -143,3 +143,23 @@ class TestEmotionAnalysis:
     def test_ai_generated_avatar(self):
         res = analyze_emotion("mock_noface_ai_avatar")
         assert res["face_detected"] == False
+
+    # ---------------- Determinism & Scientific Quality Cases ----------------
+    def test_deterministic_output_across_repeated_calls(self):
+        """Verify that outputs are 100% deterministic with zero randomized values."""
+        res1 = analyze_emotion("base64_image_data_mock_neutral")
+        res2 = analyze_emotion("base64_image_data_mock_neutral")
+        assert res1["emotion"] == res2["emotion"]
+        assert res1["confidence"] == res2["confidence"]
+        assert res1["lighting_quality"] == res2["lighting_quality"]
+        assert res1["frame_quality"] == res2["frame_quality"]
+
+    def test_zero_random_choice_fabrications(self):
+        """Verify that 10 consecutive calls with identical input return identical deterministic results."""
+        results = [analyze_emotion("base64_image_data_mock_happy") for _ in range(10)]
+        first = results[0]
+        for r in results[1:]:
+            assert r["emotion"] == first["emotion"]
+            assert r["confidence"] == first["confidence"]
+            assert r["face_detected"] == first["face_detected"]
+

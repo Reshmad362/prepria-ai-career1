@@ -12,7 +12,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { formatTime } from '../utils/activityLogger';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { API_URL } from '../utils/api';
+import { API_URL, getRecommendations, getLongitudinalProfile } from '../utils/api';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -20,6 +20,8 @@ export default function Dashboard() {
   const [userName, setUserName] = useState('User');
   const [activities, setActivities] = useState([]);
   const [isInterviewModalOpen, setIsInterviewModalOpen] = useState(false);
+  const [recommendations, setRecommendations] = useState([]);
+  const [longitudinalData, setLongitudinalData] = useState(null);
   
   // Dashboard Metrics State
   const [loading, setLoading] = useState(true);
@@ -72,7 +74,7 @@ export default function Dashboard() {
     fetchActivities();
     window.addEventListener('activityLogged', fetchActivities);
     
-    // Fetch Dashboard Analytics
+    // Fetch Dashboard Analytics, Recommendations, and Longitudinal Data
     const fetchAnalytics = async () => {
       try {
         setLoading(true);
@@ -87,15 +89,24 @@ export default function Dashboard() {
         const token = localStorage.getItem('token');
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-        const response = await fetch(
-          `${API_URL}/analytics/dashboard/${encodeURIComponent(authenticatedUserId)}`,
-          { headers }
-        );
-        if (!response.ok) throw new Error('Failed to fetch analytics');
-        
-        const result = await response.json();
-        if (result?.success && result?.data) setMetrics((prev) => ({ ...prev, ...result.data }));
-        else throw new Error('Failed to fetch analytics');
+        const [dashRes, recsRes, longRes] = await Promise.allSettled([
+          fetch(`${API_URL}/analytics/dashboard/${encodeURIComponent(authenticatedUserId)}`, { headers }),
+          getRecommendations(),
+          getLongitudinalProfile()
+        ]);
+
+        if (dashRes.status === 'fulfilled' && dashRes.value.ok) {
+          const result = await dashRes.value.json();
+          if (result?.success && result?.data) setMetrics((prev) => ({ ...prev, ...result.data }));
+        }
+
+        if (recsRes.status === 'fulfilled' && recsRes.value?.success && recsRes.value?.recommendations) {
+          setRecommendations(recsRes.value.recommendations);
+        }
+
+        if (longRes.status === 'fulfilled' && longRes.value?.success && longRes.value?.data) {
+          setLongitudinalData(longRes.value.data);
+        }
       } catch (err) {
         console.error("Dashboard fetch error:", err);
         setError("Failed to load dashboard data. Please try again later.");
@@ -269,7 +280,9 @@ export default function Dashboard() {
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-base font-extrabold text-gray-900 dark:text-white">Longitudinal Performance</h2>
             <div className="text-xs font-bold px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-600 dark:text-gray-300">
-              Trend: <span className={metrics.trend === 'Increasing' ? 'text-green-500' : metrics.trend === 'Decreasing' ? 'text-red-500' : ''}>{metrics.trend}</span>
+              Trend: <span className={(longitudinalData?.trend === 'improving' || metrics.trend === 'Increasing') ? 'text-green-500' : (longitudinalData?.trend === 'declining' || metrics.trend === 'Decreasing') ? 'text-red-500' : ''}>
+                {longitudinalData?.trend ? (longitudinalData.trend === 'improving' ? 'Improving' : longitudinalData.trend === 'declining' ? 'Declining' : longitudinalData.trend === 'steady' ? 'Steady' : 'Insufficient Evidence') : metrics.trend}
+              </span>
             </div>
           </div>
           
@@ -317,30 +330,72 @@ export default function Dashboard() {
           </h2>
           
           <div className="space-y-4">
-            <div className="bg-white/10 p-4 rounded-2xl border border-white/5 backdrop-blur-sm">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-primary block">Top Priority</span>
-              <p className="text-gray-200 text-xs mt-1 mb-3 font-semibold leading-relaxed">{metrics.recommendedNextStep}</p>
-              <Button 
-                onClick={() => navigate(metrics.recommendedNextStep.includes("Resume") ? '/resume-upload' : '/my-courses')}
-                className="w-full bg-primary hover:bg-primaryHover text-white border-0 text-xs font-bold"
-              >
-                Take Action
-              </Button>
-            </div>
-            
-            <div className="bg-white/5 p-4 rounded-2xl border border-white/5 space-y-2">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400 block">Secondary Goals</span>
-              <ul className="space-y-2 text-xs">
-                <li className="flex items-start gap-2.5">
-                  <div className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0 mt-0.5"><Briefcase className="w-3 h-3" /></div>
-                  <span className="text-gray-300">Review jobs matching {metrics.targetRole}</span>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5"><Award className="w-3 h-3" /></div>
-                  <span className="text-gray-300">Earn {metrics.targetRole} course certificate</span>
-                </li>
-              </ul>
-            </div>
+            {recommendations.length > 0 ? (
+              <>
+                <div className="bg-white/10 p-4 rounded-2xl border border-white/5 backdrop-blur-sm">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-primary block">
+                    Top Priority • {recommendations[0].priority?.toUpperCase()}
+                  </span>
+                  <h4 className="text-white text-xs font-bold mt-1">{recommendations[0].title}</h4>
+                  <p className="text-gray-200 text-xs mt-1 mb-3 font-medium leading-relaxed">{recommendations[0].description}</p>
+                  <Button 
+                    onClick={() => {
+                      const top = recommendations[0];
+                      if (top.type === 'resume') navigate('/resume-upload');
+                      else if (top.type === 'learning') navigate(top.relatedCourseId ? `/course/${top.relatedCourseId}` : '/my-courses');
+                      else if (top.type === 'interview') navigate('/mock-interview');
+                      else navigate('/career-roadmap');
+                    }}
+                    className="w-full bg-primary hover:bg-primaryHover text-white border-0 text-xs font-bold"
+                  >
+                    Take Action
+                  </Button>
+                </div>
+                
+                {recommendations.slice(1, 3).length > 0 && (
+                  <div className="bg-white/5 p-4 rounded-2xl border border-white/5 space-y-2">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400 block">Personalized Guidance</span>
+                    <ul className="space-y-2 text-xs">
+                      {recommendations.slice(1, 3).map((r, idx) => (
+                        <li key={r.recommendationId || idx} className="flex items-start gap-2.5">
+                          <div className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0 mt-0.5">
+                            {r.type === 'learning' ? <BookOpen className="w-3 h-3" /> : r.type === 'interview' ? <Target className="w-3 h-3" /> : <Briefcase className="w-3 h-3" />}
+                          </div>
+                          <span className="text-gray-300 font-medium">{r.title}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="bg-white/10 p-4 rounded-2xl border border-white/5 backdrop-blur-sm">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-primary block">Top Priority</span>
+                  <p className="text-gray-200 text-xs mt-1 mb-3 font-semibold leading-relaxed">{metrics.recommendedNextStep}</p>
+                  <Button 
+                    onClick={() => navigate(metrics.recommendedNextStep.includes("Resume") ? '/resume-upload' : '/my-courses')}
+                    className="w-full bg-primary hover:bg-primaryHover text-white border-0 text-xs font-bold"
+                  >
+                    Take Action
+                  </Button>
+                </div>
+                
+                <div className="bg-white/5 p-4 rounded-2xl border border-white/5 space-y-2">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400 block">Secondary Goals</span>
+                  <ul className="space-y-2 text-xs">
+                    <li className="flex items-start gap-2.5">
+                      <div className="w-5 h-5 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0 mt-0.5"><Briefcase className="w-3 h-3" /></div>
+                      <span className="text-gray-300">Review jobs matching {metrics.targetRole}</span>
+                    </li>
+                    <li className="flex items-start gap-2.5">
+                      <div className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5"><Award className="w-3 h-3" /></div>
+                      <span className="text-gray-300">Earn {metrics.targetRole} course certificate</span>
+                    </li>
+                  </ul>
+                </div>
+              </>
+            )}
           </div>
         </Card>
       </div>
