@@ -11,6 +11,9 @@ from pathlib import Path
 import json
 import logging
 
+import hashlib
+import hmac
+
 logger = logging.getLogger(__name__)
 
 # File-backed JSON Database Persistence
@@ -61,47 +64,58 @@ JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_EXPIRATION_HOURS = int(os.getenv("JWT_EXPIRATION_HOURS", "24"))
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "your-google-client-id-here")
 
+# Multi-scheme password hashing & verification
 try:
     import bcrypt
+    _HAS_BCRYPT = True
     def hash_password(password: str) -> str:
         if isinstance(password, str):
             password = password.encode('utf-8')
         salt = bcrypt.gensalt(rounds=12)
         return bcrypt.hashpw(password, salt).decode('utf-8')
-
-    def verify_password(plain_password: str, hashed_password: str) -> bool:
-        if not plain_password or not hashed_password:
-            return False
-        try:
-            return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
-        except Exception:
-            return False
 except ImportError:
+    _HAS_BCRYPT = False
+
+try:
+    from passlib.context import CryptContext
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    _HAS_PASSLIB = True
+except ImportError:
+    _HAS_PASSLIB = False
+
+if not _HAS_BCRYPT and not _HAS_PASSLIB:
+    def hash_password(password: str) -> str:
+        salt = secrets.token_hex(16)
+        h = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100000)
+        return f"$pbkdf2_sha256$100000${salt}${h.hex()}"
+
+def _verify_pbkdf2_password(plain_password: str, hashed_password: str) -> bool:
     try:
-        from passlib.context import CryptContext
-        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-        def hash_password(password: str) -> str:
-            return pwd_context.hash(password)
-        def verify_password(plain_password: str, hashed_password: str) -> bool:
+        parts = hashed_password.split("$")
+        if len(parts) == 5 and parts[1] == "pbkdf2_sha256":
+            rounds = int(parts[2])
+            salt = parts[3]
+            expected = parts[4]
+            h = hashlib.pbkdf2_hmac("sha256", plain_password.encode("utf-8"), salt.encode("utf-8"), rounds)
+            return hmac.compare_digest(h.hex(), expected)
+    except Exception:
+        pass
+    return False
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    if not plain_password or not hashed_password:
+        return False
+    if hashed_password.startswith("$pbkdf2_sha256$"):
+        return _verify_pbkdf2_password(plain_password, hashed_password)
+    try:
+        if _HAS_BCRYPT:
+            return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+        elif _HAS_PASSLIB:
             return pwd_context.verify(plain_password, hashed_password)
-    except ImportError:
-        import hashlib, hmac
-        def hash_password(password: str) -> str:
-            salt = secrets.token_hex(16)
-            h = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100000)
-            return f"$pbkdf2_sha256$100000${salt}${h.hex()}"
-        def verify_password(plain_password: str, hashed_password: str) -> bool:
-            try:
-                parts = hashed_password.split("$")
-                if len(parts) == 5 and parts[1] == "pbkdf2_sha256":
-                    rounds = int(parts[2])
-                    salt = parts[3]
-                    expected = parts[4]
-                    h = hashlib.pbkdf2_hmac("sha256", plain_password.encode("utf-8"), salt.encode("utf-8"), rounds)
-                    return hmac.compare_digest(h.hex(), expected)
-            except Exception:
-                pass
-            return False
+        else:
+            return _verify_pbkdf2_password(plain_password, hashed_password)
+    except Exception:
+        return False
 
 def is_hashed_password(value: str) -> bool:
     if not isinstance(value, str):
@@ -163,6 +177,10 @@ def authenticate_user(email: str, password: str):
             stored_pwd = u.get('password', '')
             if is_hashed_password(stored_pwd):
                 if verify_password(password, stored_pwd):
+                    if stored_pwd.startswith("$pbkdf2_sha256$"):
+                        logger.info("Migrating legacy PBKDF2 password to bcrypt hash for user: %s", email_clean)
+                        u['password'] = hash_password(password)
+                        _save_users_to_disk()
                     return u
             else:
                 # One-time legacy migration for existing plaintext password

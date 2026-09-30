@@ -492,3 +492,27 @@ def get_all_user_course_progress(user_id: str) -> List[Dict[str, Any]]:
     """Returns all course progress records for a given user across all courses."""
     prefix = f"{str(user_id).strip().lower()}_"
     return [v for k, v in course_progress_db.items() if k.startswith(prefix)]
+
+
+def get_user_progress_summary(user_id: str) -> Dict[str, Any]:
+    """Returns a summary of enrolled and completed courses for recommendation intelligence."""
+    prefix = f"{str(user_id).strip().lower()}_"
+    records = [v for k, v in course_progress_db.items() if k.startswith(prefix)]
+    
+    enrolled_ids = []
+    completed_ids = []
+    
+    for r in records:
+        c_id = r.get("courseId")
+        if not c_id:
+            continue
+        enrolled_ids.append(c_id)
+        if r.get("certificateEligible") or r.get("completionPercentage", 0) >= 100:
+            completed_ids.append(c_id)
+
+    return {
+        "enrolled_course_ids": enrolled_ids,
+        "completed_course_ids": completed_ids,
+        "progress_records": records
+    }
+

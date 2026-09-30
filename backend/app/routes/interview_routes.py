@@ -7,6 +7,7 @@ from app.services.question_generator import (
     generate_questions_for_role,
     generate_adaptive_questions
 )
+from app.services.dynamic_question_generator import generate_resume_driven_questions
 from app.services.interview_evaluation_service import evaluate_interview_session
 from app.services.performance_tracker import (
     record_interview,
@@ -15,7 +16,7 @@ from app.services.performance_tracker import (
     get_longitudinal_comparison
 )
 from app.services.engagement_service import record_user_activity
-from app.routes.auth_routes import get_current_user, verify_user_ownership
+from app.routes.auth_routes import get_current_user, verify_user_ownership, get_user_by_email_or_id
 
 router = APIRouter()
 
@@ -56,6 +57,14 @@ class GenerateAdaptiveInterviewRequest(BaseModel):
     role: str
     difficulty: Optional[str] = "medium"
     question_count: Optional[int] = 5
+
+class GenerateDynamicInterviewRequest(BaseModel):
+    role: str
+    interviewNumber: Optional[int] = 1
+    interview_number: Optional[int] = None
+    count: Optional[int] = 10
+    question_count: Optional[int] = None
+    difficulty: Optional[str] = "medium"
 
 class InterviewSessionSubmitRequest(BaseModel):
     roleName: str
@@ -172,6 +181,52 @@ async def generate_adaptive_interview_endpoint(
         priorSessionId=prior_session.get("id"),
         weakTopicsTargeted=weak_topics_list
     )
+
+
+@router.post("/generate-dynamic")
+@router.post("/interview/generate-dynamic")
+@router.post("/api/interview/generate-dynamic")
+async def generate_dynamic_interview_endpoint(
+    req: GenerateDynamicInterviewRequest,
+    authorization: Optional[str] = Header(None)
+):
+    """
+    Generates a dynamic candidate-specific interview session derived from parsed resume evidence.
+    - Resolves authenticated user identity strictly from JWT header.
+    - Loads candidate's authentic parsed resume (skills, projects, experience, education).
+    - Integrates previous interview session history and weak topics.
+    - Formulates auditable questions with source metadata.
+    """
+    count = req.count if (req.count is not None and req.count > 0) else (req.question_count or 10)
+    if count <= 0:
+        raise HTTPException(status_code=400, detail="count must be strictly positive.")
+    if count > 20:
+        raise HTTPException(status_code=400, detail="count cannot exceed 20.")
+
+    # Require JWT authentication for dynamic candidate-specific interviews
+    current_user = get_current_user(authorization)
+    auth_user_key = current_user.get("email") or current_user.get("id")
+
+    # Retrieve authentic profile & resume data
+    user_obj = get_user_by_email_or_id(email=auth_user_key, user_id=auth_user_key)
+    profile_data = user_obj.get("profile", {}) if user_obj else {}
+
+    # Retrieve prior session history
+    previous_sessions = get_user_interviews(auth_user_key)
+    interview_num = req.interviewNumber or req.interview_number or 1
+
+    if interview_num == 1 and previous_sessions:
+        interview_num = len(previous_sessions) + 1
+
+    result = generate_resume_driven_questions(
+        user_profile=profile_data,
+        role=req.role,
+        interview_number=interview_num,
+        count=count,
+        previous_sessions=previous_sessions
+    )
+
+    return result
 
 
 @router.post("/interview/session/submit")

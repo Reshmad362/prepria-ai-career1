@@ -16,6 +16,8 @@ from app.routes.career_routes import router as career_router
 from app.routes.email_routes import router as email_router
 from app.routes.document_routes import router as document_router
 from app.routes.job_routes import router as job_router
+from app.routes.recommendation_routes import router as recommendation_router
+from app.routes.longitudinal_routes import router as longitudinal_router
 
 app = FastAPI(title="AI Career Intelligence Platform")
 
@@ -42,6 +44,10 @@ app.include_router(career_router)
 app.include_router(email_router, prefix="/email", tags=["email"])
 app.include_router(document_router)
 app.include_router(job_router)
+app.include_router(recommendation_router)
+app.include_router(recommendation_router, prefix="/api", tags=["API Recommendations Compatibility"])
+app.include_router(longitudinal_router)
+app.include_router(longitudinal_router, prefix="/api", tags=["API Longitudinal Compatibility"])
 
 @app.get("/health")
 def health():

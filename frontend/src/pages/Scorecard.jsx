@@ -8,60 +8,118 @@ import {
   PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import { TrendingUp, Target, BrainCircuit, Activity, BarChart2, Briefcase } from 'lucide-react';
+import { API_URL } from '../utils/api';
 
 const COLORS = ['#E97862', '#22C55E', '#3B82F6', '#8B5CF6', '#F59E0B'];
 
 export default function Scorecard() {
   const { profile } = useContext(UserContext);
   const [timeRange, setTimeRange] = useState('1m');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [analytics, setAnalytics] = useState(null);
+  const [growth, setGrowth] = useState(null);
   const [activities, setActivities] = useState([]);
 
   useEffect(() => {
-    const savedActs = JSON.parse(localStorage.getItem('activities')) || [];
-    setActivities(savedActs.reverse()); // Chronological order for charts
-  }, []);
+    const fetchScorecardData = async () => {
+      try {
+        setLoading(true);
+        const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const authKey = profile?.email || profile?.id || storedUser.email || localStorage.getItem('activeUser');
 
-  // Filter activities
-  const atsActivities = activities.filter(a => a.type === 'resume_upload' && a.metadata?.score);
-  const interviewActivities = activities.filter(a => a.type === 'interview_complete');
+        if (!authKey) {
+          setLoading(false);
+          return;
+        }
 
-  // 1. ATS Score Trend
-  let atsData = atsActivities.map((act, i) => ({
-      name: `Scan ${i + 1}`,
-      score: act.metadata.score
+        const token = localStorage.getItem('token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+        const [dashRes, growthRes, actRes] = await Promise.all([
+          fetch(`${API_URL}/analytics/dashboard/${encodeURIComponent(authKey)}`, { headers }),
+          fetch(`${API_URL}/analytics/growth/${encodeURIComponent(authKey)}`, { headers }),
+          fetch(`${API_URL}/analytics/activity/${encodeURIComponent(authKey)}`, { headers })
+        ]);
+
+        if (dashRes.ok) {
+          const dashJson = await dashRes.json();
+          if (dashJson.success) setAnalytics(dashJson.data);
+        }
+
+        if (growthRes.ok) {
+          const growthJson = await growthRes.json();
+          if (growthJson.success) setGrowth(growthJson.data);
+        }
+
+        if (actRes.ok) {
+          const actJson = await actRes.json();
+          if (actJson.success && Array.isArray(actJson.data)) {
+            setActivities(actJson.data);
+          }
+        }
+      } catch (err) {
+        console.error("Scorecard fetch error:", err);
+        setError("Failed to load analytics");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchScorecardData();
+  }, [profile]);
+
+  // 1. Interview Performance Trend from backend history
+  const historyList = growth?.history || analytics?.recentHistory || [];
+  let interviewData = historyList.map((item, i) => ({
+    name: item.name || `Int ${i + 1}`,
+    score: item.score || 0,
+    confidence: item.confidence || 0
   }));
-  if (atsData.length === 0) atsData = [{ name: 'No Data', score: 0 }];
+  if (interviewData.length === 0) {
+    interviewData = [{ name: 'No Data', score: 0, confidence: 0 }];
+  }
 
-  // 2. Interview Performance Trend
-  let interviewData = interviewActivities.map((act, i) => ({
-      name: `Int ${i + 1}`,
-      score: act.metadata?.score || 0,
-      confidence: act.metadata?.confidence || (act.metadata?.score ? act.metadata.score - 10 : 0) // Mock confidence if missing
-  }));
-  if (interviewData.length === 0) interviewData = [{ name: 'No Data', score: 0, confidence: 0 }];
+  // 2. Behavioral Radar Chart - 5 Authoritative Pillars
+  const dimensions = analytics?.dimensions || {
+    technicalKnowledge: 0,
+    problemSolving: 0,
+    communication: 0,
+    roleKnowledge: 0,
+    confidence: 0
+  };
 
-  // 3. Radar Chart (Skills & Behavioral)
-  // We'll calculate a mock average based on the latest interview score, or default to 50
-  const latestIntScore = interviewData[interviewData.length - 1].score || 50;
   const radarData = [
-      { subject: 'Tech Skills', A: Math.min(100, latestIntScore + 5), fullMark: 100 },
-      { subject: 'Communication', A: Math.min(100, latestIntScore + 10), fullMark: 100 },
-      { subject: 'Problem Solving', A: latestIntScore, fullMark: 100 },
-      { subject: 'STAR Method', A: Math.max(0, latestIntScore - 15), fullMark: 100 },
-      { subject: 'Confidence', A: Math.max(0, latestIntScore - 5), fullMark: 100 },
-      { subject: 'Eye Contact', A: Math.min(100, latestIntScore + 8), fullMark: 100 },
+    { subject: 'Technical Knowledge', A: dimensions.technicalKnowledge || 0, fullMark: 100 },
+    { subject: 'Problem Solving', A: dimensions.problemSolving || 0, fullMark: 100 },
+    { subject: 'Communication', A: dimensions.communication || 0, fullMark: 100 },
+    { subject: 'Role Knowledge', A: dimensions.roleKnowledge || 0, fullMark: 100 },
+    { subject: 'Confidence', A: dimensions.confidence || 0, fullMark: 100 },
   ];
 
-  // 4. Pie Chart (Time Spent or Activity Distribution)
+  // 3. ATS Score Progression from authentic activities
+  const atsActivities = activities.filter(a => (a.activity_type === 'resume_upload' || a.activity_type === 'ATS_SCAN') && a.metadata?.score);
+  let atsData = atsActivities.map((act, i) => ({
+    name: `Scan ${i + 1}`,
+    score: act.metadata.score
+  }));
+  if (atsData.length === 0 && analytics?.atsScore) {
+    atsData = [{ name: 'Current Resume', score: analytics.atsScore }];
+  }
+  if (atsData.length === 0) {
+    atsData = [{ name: 'No Data', score: 0 }];
+  }
+
+  // 4. Activity Distribution from backend metrics
   const pieData = [
-      { name: 'Mock Interviews', value: interviewActivities.length || 1 },
-      { name: 'Resume Scans', value: atsActivities.length || 1 },
-      { name: 'Course Progress', value: 2 }, // Mock course progress
-      { name: 'Profile Updates', value: activities.filter(a => a.type === 'profile_updated').length || 1 }
+    { name: 'Mock Interviews', value: analytics?.interviewCount || (historyList.length > 0 ? historyList.length : 0) },
+    { name: 'Resume Scans', value: atsActivities.length || (analytics?.atsScore ? 1 : 0) },
+    { name: 'Lessons Completed', value: analytics?.lessonsCompleted || 0 },
+    { name: 'Assessments Passed', value: analytics?.assessmentsPassed || 0 }
   ];
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="max-w-7xl mx-auto space-y-6 pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500 font-manrope">
       
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
@@ -87,6 +145,12 @@ export default function Scorecard() {
           ))}
         </div>
       </div>
+
+      {error && (
+        <div className="p-4 bg-red-50 text-red-600 border border-red-200 rounded-xl text-xs font-bold">
+          {error}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
@@ -213,3 +277,4 @@ export default function Scorecard() {
     </div>
   );
 }
+

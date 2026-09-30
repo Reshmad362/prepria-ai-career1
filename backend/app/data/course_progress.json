@@ -87,6 +87,36 @@
     "processedQuizSubmissionIds": [],
     "updatedAt": "2026-09-23T09:05:20.713061"
   },
+  "phase6_user_a@prepria.com_devops-foundations": {
+    "userId": "phase6_user_a@prepria.com",
+    "courseId": "devops-foundations",
+    "completedItemIds": [
+      "devops-mod1-les1"
+    ],
+    "quizScores": {},
+    "finalAssessment": {},
+    "lessonTimeSpent": {
+      "devops-mod1-les1": 65
+    },
+    "lastAccessed": {},
+    "totalRequiredItems": 6,
+    "completionPercentage": 16,
+    "certificateEligible": false,
+    "processedHeartbeatIds": [],
+    "processedQuizSubmissionIds": [],
+    "updatedAt": "2026-09-25T17:52:03.515112"
+  },
+  "phase8_user_a@prepria.test_devops-foundations": {
+    "userId": "phase8_user_a@prepria.test",
+    "courseId": "devops-foundations",
+    "isPassed": true,
+    "eligibleForCertificate": true,
+    "completedItemIds": [
+      "devops-mod1-les1",
+      "devops-mod1-les2",
+      "devops-mod1-quiz"
+    ]
+  },
   "learner_a@prepria.com_devops-foundations": {
     "userId": "learner_a@prepria.com",
     "courseId": "devops-foundations",
@@ -120,7 +150,7 @@
       "attempts": 1,
       "validated": true,
       "lastAttemptScore": 100,
-      "completedAt": "2026-09-23T09:25:26.896354"
+      "completedAt": "2026-09-25T17:52:03.116287"
     },
     "lessonTimeSpent": {
       "devops-mod1-les1": 65,
@@ -190,7 +220,7 @@
       "sub_quiz_mod1_attempt_3",
       "sub_quiz_mod2_pass"
     ],
-    "updatedAt": "2026-09-23T09:25:26.896415"
+    "updatedAt": "2026-09-25T17:52:03.116315"
   },
   "learner_b@prepria.com_react-mastery": {
     "userId": "learner_b@prepria.com",
@@ -218,7 +248,7 @@
       "hb_devB_les2_3"
     ],
     "processedQuizSubmissionIds": [],
-    "updatedAt": "2026-09-23T09:25:27.145874"
+    "updatedAt": "2026-09-25T17:52:03.188062"
   },
   "fe101_learner@prepria.com_fe-101": {
     "userId": "fe101_learner@prepria.com",
@@ -251,7 +281,7 @@
       "hb_fe101_9"
     ],
     "processedQuizSubmissionIds": [],
-    "updatedAt": "2026-09-23T09:25:27.492062"
+    "updatedAt": "2026-09-25T17:52:03.332033"
   },
   "under_dwell_user@prepria.com_fe-101": {
     "userId": "under_dwell_user@prepria.com",
@@ -272,6 +302,6 @@
       "hb_under_2"
     ],
     "processedQuizSubmissionIds": [],
-    "updatedAt": "2026-09-23T09:25:27.575390"
+    "updatedAt": "2026-09-25T17:52:03.376873"
   }
 }

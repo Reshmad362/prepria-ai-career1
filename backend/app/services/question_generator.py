@@ -1,5 +1,5 @@
 import random
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 COMMON_HR_QUESTIONS = [
     {"type": "HR", "topic": "Personal Introduction", "difficulty": "easy", "question": "Tell me about yourself."},

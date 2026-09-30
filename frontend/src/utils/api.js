@@ -1,5 +1,5 @@
 // frontend/src/utils/api.js
-export const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+export const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
 
 export const getAuthHeaders = (includeJson = true) => {
   const headers = {};
@@ -44,3 +44,13 @@ export const generateFollowUp = async (prompt) => {
   if (!response.ok) throw new Error("Failed to generate follow-up question");
   return await response.json();
 };
+
+export const generateDynamicQuestions = async (role, interviewNumber = 1, count = 10) => {
+  const response = await authenticatedFetch(`${API_URL}/api/interview/generate-dynamic`, {
+    method: "POST",
+    body: JSON.stringify({ role, interviewNumber, count })
+  });
+  if (!response.ok) throw new Error("Failed to generate dynamic questions");
+  return await response.json();
+};
+

@@ -16,14 +16,15 @@ except ImportError as e:
         return {"pause_count": 0, "long_pauses": 0, "max_pause_duration": 0.0}
 
 def analyze_speech(text: str, duration_seconds: int) -> dict:
+    text_clean = str(text or "").strip()
     # Get stats from individual detectors
-    filler_data = detect_fillers(text)
+    filler_data = detect_fillers(text_clean)
     
     # Handle negative / invalid duration
     if duration_seconds < 0:
         duration_seconds = 0
         
-    pause_data = detect_pauses(duration_seconds, text)
+    pause_data = detect_pauses(duration_seconds, text_clean)
     
     # Calculate fluency score
     filler_count = filler_data["filler_count"]
@@ -35,7 +36,7 @@ def analyze_speech(text: str, duration_seconds: int) -> dict:
         100 - (filler_count * 5) - (pause_count * 2) - (long_pauses * 5)
     )
     
-    words = len(text.strip().split()) if text.strip() else 0
+    words = len(text_clean.split()) if text_clean else 0
     wpm = round((words / (duration_seconds / 60.0)), 1) if duration_seconds > 0 else 0
         
     return {

@@ -225,6 +225,11 @@ async def get_dashboard(user_id: str, authorization: Optional[str] = Header(None
         latest_fluency = int(latest.get("fluency_score", 0) or 0) if latest else 0
         latest_confidence = float(latest.get("emotion_confidence", 0) or 0) if latest else 0.0
         latest_ats = int(latest.get("ats_score", 0) or 0) if latest else 0
+        if not latest_ats:
+            from app.services.auth_service import get_user_by_email_or_id
+            u_obj = get_user_by_email_or_id(email=user_lower)
+            if u_obj and isinstance(u_obj.get("profile"), dict):
+                latest_ats = int(u_obj["profile"].get("score", 0) or u_obj["profile"].get("ats_score", 0) or 0)
 
         # Normalize score into a 0..100 percent for the UI cards.
         interview_score_pct = int(latest_score * 100) if latest_score <= 1 else int(latest_score)
@@ -256,20 +261,98 @@ async def get_dashboard(user_id: str, authorization: Optional[str] = Header(None
 
         recommended_next_step = "Upload Resume"
 
+        # Course progress calculation
+        all_prog = get_all_user_course_progress(user_lower)
+        courses_completed = engagement.get("coursesCompleted", 0)
+        total_courses_count = max(2, len(all_prog)) if all_prog else 2
+        course_pct = int(sum(p.get("completionPercentage", 0) for p in all_prog) / max(1, len(all_prog))) if all_prog else 0
+
+        # Overall & best scores calculation across interviews
+        if user_interviews:
+            scores_list = []
+            for inv in user_interviews:
+                raw_s = inv.get("overallScore") if inv.get("overallScore") is not None else inv.get("score", 0)
+                scores_list.append(int(raw_s * 100) if (isinstance(raw_s, float) and 0 < raw_s <= 1.0) else int(raw_s or 0))
+            overall_score = int(sum(scores_list) / len(scores_list))
+            best_score = max(scores_list)
+        else:
+            overall_score = 0
+            best_score = 0
+
+        # Dimension metrics from latest session if available
+        if latest and latest.get("dimensions"):
+            dims = latest["dimensions"]
+            tech_k = int(dims.get("technicalKnowledge", 0))
+            ps_k = int(dims.get("problemSolving", 0))
+            comm_k = int(dims.get("communication", 0))
+            role_k = int(dims.get("roleKnowledge", 0))
+            conf_k = int(dims.get("confidence", 0))
+        elif latest:
+            tech_k = interview_score_pct
+            ps_k = interview_score_pct
+            comm_k = latest_fluency or interview_score_pct
+            role_k = interview_score_pct
+            conf_k = confidence_pct
+        else:
+            tech_k = 0
+            ps_k = 0
+            comm_k = 0
+            role_k = 0
+            conf_k = 0
+
+        score_delta = growth.get("scoreDelta", 0) if isinstance(growth, dict) else 0
+
+        # Formatted recent interviews summary
+        recent_interviews_summary = []
+        for inv in user_interviews[:5]:
+            raw_s = inv.get("overallScore") if inv.get("overallScore") is not None else inv.get("score", 0)
+            inv_score = int(raw_s * 100) if (isinstance(raw_s, float) and 0 < raw_s <= 1.0) else int(raw_s or 0)
+            recent_interviews_summary.append({
+                "id": inv.get("id"),
+                "role": inv.get("roleName") or inv.get("role", "Technical"),
+                "score": inv_score,
+                "completedAt": inv.get("completedAt") or inv.get("timestamp"),
+                "dimensions": inv.get("dimensions") or {}
+            })
+
         data = {
-            "aiCareerScore": ai_career_score_pct,
-            "careerReadiness": career_readiness,
+            "userId": auth_user_key,
+            "overallScore": overall_score,
+            "interviewCount": len(user_interviews),
+            "bestScore": best_score,
+            "latestScore": interview_score_pct,
+            "scoreDelta": score_delta,
+            "dimensions": {
+                "technicalKnowledge": tech_k,
+                "problemSolving": ps_k,
+                "communication": comm_k,
+                "roleKnowledge": role_k,
+                "confidence": conf_k
+            },
+            "skills": growth.get("improved_skills", []) if isinstance(growth, dict) else [],
+            "weakAreas": growth.get("weak_areas", []) if isinstance(growth, dict) else [],
+            "courseProgress": {
+                "completed": courses_completed,
+                "total": total_courses_count,
+                "percentage": course_pct
+            },
+            "readiness": overall_score,
+            "recentInterviews": recent_interviews_summary,
+
+            # Dashboard.jsx UI backward-compatibility keys:
+            "aiCareerScore": interview_score_pct if user_interviews else 0,
+            "careerReadiness": career_readiness if user_interviews else "Low",
             "atsScore": latest_ats,
             "resumeMatch": f"{latest_ats}%",
-            "technicalScore": latest_fluency,
-            "communicationScore": latest_fluency,
-            "confidenceScore": confidence_pct,
+            "technicalScore": tech_k,
+            "communicationScore": comm_k,
+            "confidenceScore": conf_k,
             "currentStreak": engagement.get("currentStreak", 0),
             "learningHours": int((engagement.get("learningTime", {}).get("thisWeekMinutes", 0) or 0) / 60),
             "learningTimeFormatted": engagement.get("learningTime", {}).get("thisWeekFormatted", "0m"),
             "lessonsCompleted": engagement.get("lessonsCompleted", 0),
             "assessmentsPassed": engagement.get("assessmentsPassed", 0),
-            "coursesCompleted": engagement.get("coursesCompleted", 0),
+            "coursesCompleted": courses_completed,
             "certificatesEarned": engagement.get("certificatesEarned", 0),
             "skillsDemonstrated": growth.get("improved_skills", []) if isinstance(growth, dict) else [],
             "skillsDemonstratedCount": len(growth.get("improved_skills", []) or []) if isinstance(growth, dict) else 0,

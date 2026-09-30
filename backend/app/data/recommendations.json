@@ -1,0 +1,104 @@
+{
+  "phase9_user_a@prepria.test": {
+    "rec_c00e04b14d49": {
+      "recommendationId": "rec_c00e04b14d49",
+      "userId": "phase9_user_a@prepria.test",
+      "type": "interview",
+      "title": "Complete Baseline Mock Interview for Full Stack Developer",
+      "description": "Take a baseline AI mock interview for 'Full Stack Developer' to evaluate technical readiness and establish benchmark metrics.",
+      "priority": "high",
+      "reason": "No mock interviews completed for target role 'Full Stack Developer'.",
+      "source": "interview_history",
+      "sourceEvidence": [
+        "Candidate selected target role 'Full Stack Developer'",
+        "No completed interview sessions recorded in interview history"
+      ],
+      "relatedSkill": "Full Stack Developer",
+      "relatedTopic": "Mock Interview Baseline",
+      "relatedCourseId": null,
+      "status": "new",
+      "createdAt": "2026-09-25T17:59:36.405862",
+      "updatedAt": "2026-09-25T17:59:36.405862"
+    },
+    "rec_596c17fccbfc": {
+      "recommendationId": "rec_596c17fccbfc",
+      "userId": "phase9_user_a@prepria.test",
+      "type": "role_gap",
+      "title": "Acquire SQL for Full Stack Developer Role",
+      "description": "Develop 'SQL' proficiency to close the gap between your candidate profile and 'Full Stack Developer' requirements.",
+      "priority": "medium",
+      "reason": "Target role 'Full Stack Developer' requires 'SQL', which is missing from your profile.",
+      "source": "role_gap",
+      "sourceEvidence": [
+        "Target role 'Full Stack Developer' requires competency in 'SQL'",
+        "Skill 'SQL' is not currently listed on your profile/resume"
+      ],
+      "relatedSkill": "SQL",
+      "relatedTopic": "SQL",
+      "relatedCourseId": "sql-database-optimization",
+      "status": "new",
+      "createdAt": "2026-09-25T17:59:36.405862",
+      "updatedAt": "2026-09-25T17:59:36.405862"
+    },
+    "rec_86e2b67783a8": {
+      "recommendationId": "rec_86e2b67783a8",
+      "userId": "phase9_user_a@prepria.test",
+      "type": "role_gap",
+      "title": "Acquire REST APIs for Full Stack Developer Role",
+      "description": "Develop 'REST APIs' proficiency to close the gap between your candidate profile and 'Full Stack Developer' requirements.",
+      "priority": "medium",
+      "reason": "Target role 'Full Stack Developer' requires 'REST APIs', which is missing from your profile.",
+      "source": "role_gap",
+      "sourceEvidence": [
+        "Target role 'Full Stack Developer' requires competency in 'REST APIs'",
+        "Skill 'REST APIs' is not currently listed on your profile/resume"
+      ],
+      "relatedSkill": "REST APIs",
+      "relatedTopic": "REST APIs",
+      "relatedCourseId": "be-101",
+      "status": "new",
+      "createdAt": "2026-09-25T17:59:36.405862",
+      "updatedAt": "2026-09-25T17:59:36.405862"
+    },
+    "rec_b3ac69cd036a": {
+      "recommendationId": "rec_b3ac69cd036a",
+      "userId": "phase9_user_a@prepria.test",
+      "type": "role_gap",
+      "title": "Acquire System Architecture for Full Stack Developer Role",
+      "description": "Develop 'System Architecture' proficiency to close the gap between your candidate profile and 'Full Stack Developer' requirements.",
+      "priority": "medium",
+      "reason": "Target role 'Full Stack Developer' requires 'System Architecture', which is missing from your profile.",
+      "source": "role_gap",
+      "sourceEvidence": [
+        "Target role 'Full Stack Developer' requires competency in 'System Architecture'",
+        "Skill 'System Architecture' is not currently listed on your profile/resume"
+      ],
+      "relatedSkill": "System Architecture",
+      "relatedTopic": "System Architecture",
+      "relatedCourseId": "system-design-mastery",
+      "status": "new",
+      "createdAt": "2026-09-25T17:59:36.405862",
+      "updatedAt": "2026-09-25T17:59:36.405862"
+    },
+    "rec_fb0aadf4168f": {
+      "recommendationId": "rec_fb0aadf4168f",
+      "userId": "phase9_user_a@prepria.test",
+      "type": "role_gap",
+      "title": "Acquire Node.js for Full Stack Developer Role",
+      "description": "Develop 'Node.js' proficiency to close the gap between your candidate profile and 'Full Stack Developer' requirements.",
+      "priority": "medium",
+      "reason": "Target role 'Full Stack Developer' requires 'Node.js', which is missing from your profile.",
+      "source": "role_gap",
+      "sourceEvidence": [
+        "Target role 'Full Stack Developer' requires competency in 'Node.js'",
+        "Skill 'Node.js' is not currently listed on your profile/resume"
+      ],
+      "relatedSkill": "Node.js",
+      "relatedTopic": "Node.js",
+      "relatedCourseId": "be-102",
+      "status": "new",
+      "createdAt": "2026-09-25T17:59:36.405862",
+      "updatedAt": "2026-09-25T17:59:36.405862"
+    }
+  }
+}

@@ -130,24 +130,82 @@ def get_growth_analytics(user_id: str) -> Dict[str, Any]:
 
     if not user_interviews:
         return {
-             "score_trend": "Insufficient Data",
-             "growth_percentage": 0.0,
-             "weak_areas": [],
-             "improved_skills": [],
-             "history": []
+            "hasHistory": False,
+            "sessions": [],
+            "scoreTrend": [],
+            "dimensionTrends": {
+                "technicalKnowledge": [],
+                "problemSolving": [],
+                "communication": [],
+                "roleKnowledge": [],
+                "confidence": []
+            },
+            "scoreDelta": 0,
+            "weakAreas": [],
+            "demonstratedSkills": [],
+            "score_trend": "Insufficient Data",
+            "growth_percentage": 0.0,
+            "weak_areas": [],
+            "improved_skills": [],
+            "demonstrated_skills": [],
+            "history": []
         }
 
     history = []
-    
-    # Extract numerical scores
+    sessions_summary = []
+    score_trend = []
+    dim_trends = {
+        "technicalKnowledge": [],
+        "problemSolving": [],
+        "communication": [],
+        "roleKnowledge": [],
+        "confidence": []
+    }
+
     scores = []
-    for inv in user_interviews:
+    for idx, inv in enumerate(user_interviews):
         raw_score = inv.get("overallScore") if inv.get("overallScore") is not None else inv.get("score", 0)
-        # Normalize to 0-100 integer
         score_val = int(raw_score * 100) if (isinstance(raw_score, float) and raw_score <= 1.0 and raw_score > 0) else int(raw_score or 0)
         scores.append(score_val)
+        score_trend.append(score_val)
 
-    # Analyze trends
+        dims = inv.get("dimensions") or {}
+        tech = dims.get("technicalKnowledge", score_val)
+        ps = dims.get("problemSolving", score_val)
+        comm = dims.get("communication", inv.get("fluency_score", score_val))
+        role = dims.get("roleKnowledge", score_val)
+        conf = dims.get("confidence", int((inv.get("emotion_confidence", 0.75) if isinstance(inv.get("emotion_confidence"), float) and inv.get("emotion_confidence") <= 1.0 else 75)))
+
+        dim_trends["technicalKnowledge"].append(int(tech))
+        dim_trends["problemSolving"].append(int(ps))
+        dim_trends["communication"].append(int(comm))
+        dim_trends["roleKnowledge"].append(int(role))
+        dim_trends["confidence"].append(int(conf))
+
+        history.append({
+            "name": f"Session {idx + 1}",
+            "score": score_val,
+            "fluency": int(comm),
+            "confidence": int(conf),
+            "ats": int(inv.get("ats_score", 0))
+        })
+
+        sessions_summary.append({
+            "id": inv.get("id"),
+            "name": f"Session {idx + 1}",
+            "role": inv.get("roleName") or inv.get("role", "Technical"),
+            "score": score_val,
+            "completedAt": inv.get("completedAt") or inv.get("timestamp"),
+            "dimensions": {
+                "technicalKnowledge": int(tech),
+                "problemSolving": int(ps),
+                "communication": int(comm),
+                "roleKnowledge": int(role),
+                "confidence": int(conf)
+            }
+        })
+
+    # Analyze trends & score delta
     if len(scores) >= 2:
         first_score = scores[0]
         last_score = scores[-1]
@@ -162,9 +220,11 @@ def get_growth_analytics(user_id: str) -> Dict[str, Any]:
         else:
             trend = "Stagnant"
             growth_pct = 0.0
+        score_delta = score_diff
     else:
         trend = "Initial Baseline Established"
         growth_pct = 0.0
+        score_delta = 0
 
     # Derive genuine Weak Areas and Improved Skills from actual question evaluations
     recent_interviews = user_interviews[-3:]
@@ -181,7 +241,6 @@ def get_growth_analytics(user_id: str) -> Dict[str, Any]:
             elif q_score >= 75 and topic != "General":
                 improved_skills_set.add(topic)
                 
-        # Also check communication / fluency metrics
         dims = inv.get("dimensions") or {}
         comm_score = dims.get("communication", inv.get("fluency_score", 100))
         if comm_score < 60:
@@ -189,31 +248,23 @@ def get_growth_analytics(user_id: str) -> Dict[str, Any]:
         elif comm_score >= 80:
             improved_skills_set.add("Clear Communication")
 
-    # Format history strictly for Recharts UI
-    for idx, inv in enumerate(user_interviews):
-        raw_score = inv.get("overallScore") if inv.get("overallScore") is not None else inv.get("score", 0)
-        score_val = int(raw_score * 100) if (isinstance(raw_score, float) and raw_score <= 1.0 and raw_score > 0) else int(raw_score or 0)
-        
-        dims = inv.get("dimensions") or {}
-        fluency = dims.get("communication") or inv.get("fluency_score", score_val)
-        confidence = dims.get("confidence") or int((inv.get("emotion_confidence", 0.75) if isinstance(inv.get("emotion_confidence"), float) and inv.get("emotion_confidence") <= 1.0 else 75))
-        ats = inv.get("ats_score", 0)
-
-        history.append({
-            "name": f"Session {idx + 1}",
-            "score": score_val,
-            "fluency": int(fluency),
-            "confidence": int(confidence),
-            "ats": int(ats)
-        })
+    weak_list = sorted(list(weak_areas_set))
+    improved_list = sorted(list(improved_skills_set))
 
     return {
-         "score_trend": trend,
-         "growth_percentage": round(growth_pct, 1),
-         "weak_areas": sorted(list(weak_areas_set)),
-         "improved_skills": sorted(list(improved_skills_set)),
-         "demonstrated_skills": sorted(list(improved_skills_set)),
-         "history": history
+        "hasHistory": True,
+        "sessions": sessions_summary,
+        "scoreTrend": score_trend,
+        "dimensionTrends": dim_trends,
+        "scoreDelta": score_delta,
+        "weakAreas": weak_list,
+        "demonstratedSkills": improved_list,
+        "score_trend": trend,
+        "growth_percentage": round(growth_pct, 1),
+        "weak_areas": weak_list,
+        "improved_skills": improved_list,
+        "demonstrated_skills": improved_list,
+        "history": history
     }
 
 
@@ -343,5 +394,35 @@ def get_longitudinal_comparison(user_id: str) -> Dict[str, Any]:
         "persistentWeaknesses": persistent_weaknesses,
         "weaknessResolutionRate": round((len(resolved_weaknesses) / max(len(baseline_weaknesses), 1)) * 100, 1) if baseline_weaknesses else 100.0
     }
+
+
+def get_user_performance_summary(user_id: str) -> Dict[str, Any]:
+    """
+    Returns a unified performance summary used by recommendation intelligence.
+    """
+    analytics = get_growth_analytics(user_id)
+    comp = get_longitudinal_comparison(user_id)
+    
+    persistent = []
+    if comp.get("hasComparison"):
+        for item in comp.get("persistentWeaknesses", []):
+            if isinstance(item, dict) and item.get("topic"):
+                persistent.append(item["topic"])
+
+    weak_areas = analytics.get("weak_areas", [])
+    improved = analytics.get("improved_skills", [])
+    
+    sessions = analytics.get("sessions", [])
+    latest_score = sessions[-1].get("score", 0.0) if sessions else 0.0
+    score_change = analytics.get("scoreDelta", 0.0)
+
+    return {
+        "persistent_weaknesses": persistent if persistent else weak_areas,
+        "recurring_weaknesses": weak_areas,
+        "improved_topics": improved,
+        "latest_score": latest_score,
+        "score_change": score_change
+    }
+
 
 

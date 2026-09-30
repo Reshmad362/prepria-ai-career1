@@ -30,14 +30,17 @@ export default function GrowthDashboard() {
 
   if (!data) return <div className="h-48 flex items-center justify-center text-on-surface-variant font-medium">Loading Growth Analytics...</div>;
 
-  // Radar logic mapping for skills (using hardcoded fallback if needed, or deriving from gaps)
+  // Radar chart mapped strictly from backend evaluation dimensions
+  const latestDims = (data.sessions && data.sessions.length > 0)
+    ? data.sessions[data.sessions.length - 1].dimensions
+    : null;
+
   const radarData = [
-    { subject: 'System Design', score: data.weak_areas.includes('System Design') ? 40 : 85, fullMark: 100 },
-    { subject: 'SQL', score: data.weak_areas.includes('SQL') ? 35 : 90, fullMark: 100 },
-    { subject: 'Algorithms', score: 80, fullMark: 100 },
-    { subject: 'React', score: 95, fullMark: 100 },
-    { subject: 'Communication', score: data.history.length > 0 ? data.history[data.history.length-1].fluency : 50, fullMark: 100 },
-    { subject: 'ATS Formatting', score: data.history.length > 0 ? data.history[data.history.length-1].ats : 50, fullMark: 100 }
+    { subject: 'Technical Knowledge', score: latestDims?.technicalKnowledge ?? (data.history?.length > 0 ? data.history[data.history.length - 1].score : 0), fullMark: 100 },
+    { subject: 'Problem Solving', score: latestDims?.problemSolving ?? (data.history?.length > 0 ? data.history[data.history.length - 1].score : 0), fullMark: 100 },
+    { subject: 'Communication', score: latestDims?.communication ?? (data.history?.length > 0 ? data.history[data.history.length - 1].fluency : 0), fullMark: 100 },
+    { subject: 'Role Knowledge', score: latestDims?.roleKnowledge ?? (data.history?.length > 0 ? data.history[data.history.length - 1].score : 0), fullMark: 100 },
+    { subject: 'Confidence', score: latestDims?.confidence ?? (data.history?.length > 0 ? data.history[data.history.length - 1].confidence : 0), fullMark: 100 }
   ];
 
   return (

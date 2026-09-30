@@ -161,7 +161,14 @@ def evaluate_interview_session(
             "hasSTARStructure": eval_res["hasSTARStructure"],
             "status": eval_res["status"],
             "feedback": eval_res["feedback"],
-            "speech_analysis": eval_res["speech_analysis"]
+            "speech_analysis": eval_res["speech_analysis"],
+            "source": q_item.get("source"),
+            "sourceType": q_item.get("sourceType"),
+            "sourceValue": q_item.get("sourceValue"),
+            "difficulty": q_item.get("difficulty"),
+            "type": q_item.get("type"),
+            "targetedWeakness": q_item.get("targetedWeakness"),
+            "isTargetedRemediation": q_item.get("isTargetedRemediation", False)
         }
         question_evaluations.append(q_eval)
 

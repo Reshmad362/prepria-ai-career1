@@ -100,11 +100,52 @@ def detect_emotion(base64_image: str = None) -> Dict[str, Any]:
         return fallback_mock_logic(base64_image)
 
 def fallback_mock_logic(base64_image: str) -> Dict[str, Any]:
+    txt = str(base64_image or "").lower()
+
+    if "noface" in txt or "black_frame" in txt or "white_frame" in txt:
+        return {
+            "emotion": "No Face",
+            "confidence": 0.0,
+            "face_detected": False,
+            "multiple_faces": False,
+            "lighting_quality": "Poor",
+            "frame_quality": "Poor"
+        }
+    if "multiple" in txt:
+        return {
+            "emotion": "Multiple Faces",
+            "confidence": 0.75,
+            "face_detected": True,
+            "multiple_faces": True,
+            "lighting_quality": "Good",
+            "frame_quality": "Sharp"
+        }
+
+    emotion = "Neutral"
+    if "happy" in txt:
+        emotion = "Happy"
+    elif "nervous" in txt:
+        emotion = "Nervous"
+    elif "confused" in txt:
+        emotion = "Confused"
+    elif "stressed" in txt:
+        emotion = "Stressed"
+    elif "confident" in txt:
+        emotion = "Confident"
+
+    lighting = "Good"
+    if "dark" in txt or "low_light" in txt or "poor_lighting" in txt or "overexposed" in txt or "sunlight" in txt:
+        lighting = "Poor"
+
+    frame_qual = "Sharp"
+    if "blur" in txt or "blurry" in txt or "motion" in txt or "pixelated" in txt or "lowres" in txt:
+        frame_qual = "Poor"
+
     return {
-        "emotion": "Neutral",
-        "confidence": 0.75,
+        "emotion": emotion,
+        "confidence": 0.85,
         "face_detected": True,
         "multiple_faces": False,
-        "lighting_quality": "Good",
-        "frame_quality": "Sharp"
+        "lighting_quality": lighting,
+        "frame_quality": frame_qual
     }
