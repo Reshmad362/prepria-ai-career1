@@ -89,4 +89,71 @@ export const getTopicLongitudinalDetail = async (topic) => {
   return await response.json();
 };
 
+export const getCareerRoadmap = async (targetRole = null) => {
+  const query = targetRole ? `?target_role=${encodeURIComponent(targetRole)}` : "";
+  const response = await authenticatedFetch(`${API_URL}/api/career/roadmap${query}`, {
+    method: "GET"
+  });
+  if (!response.ok) throw new Error("Failed to fetch career roadmap");
+  return await response.json();
+};
+
+export const updateRoadmapTargetRole = async (targetRole) => {
+  const response = await authenticatedFetch(`${API_URL}/api/career/roadmap/target-role`, {
+    method: "POST",
+    body: JSON.stringify({ target_role: targetRole })
+  });
+  if (!response.ok) throw new Error("Failed to update target role");
+  return await response.json();
+};
+
+export const completeRoadmapMilestone = async (milestoneId) => {
+  const response = await authenticatedFetch(`${API_URL}/api/career/roadmap/milestone/${encodeURIComponent(milestoneId)}/complete`, {
+    method: "POST"
+  });
+  if (!response.ok) throw new Error("Failed to complete roadmap milestone");
+  return await response.json();
+};
+
+export const getCareerDomains = async () => {
+  const response = await authenticatedFetch(`${API_URL}/api/career/roadmap/domains`, {
+    method: "GET"
+  });
+  if (!response.ok) throw new Error("Failed to fetch career domains");
+  return await response.json();
+};
+
+export const downloadInterviewPdf = async (sessionId, userId = null) => {
+  const token = localStorage.getItem("token");
+  const headers = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  const endpoint = userId 
+    ? `${API_URL}/api/interview/report/${encodeURIComponent(userId)}/${encodeURIComponent(sessionId)}/pdf`
+    : `${API_URL}/api/interview/report/${encodeURIComponent(sessionId)}/pdf`;
+
+  const response = await fetch(endpoint, {
+    method: "GET",
+    headers
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to generate PDF report from server");
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `prepria-interview-report-${sessionId}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+  return true;
+};
+
+
+
 

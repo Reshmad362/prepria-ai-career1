@@ -286,10 +286,7 @@ def save_user_course_progress(user_id: str, course_id: str, progress_data: Dict[
         answers_by_qid = quiz_submission.get("answersByQuestionId") or {}
 
         if quiz_id and sub_id not in processed_quiz_subs:
-            auth_questions = get_quiz_questions(course_id, quiz_id, course_def)
-            if not auth_questions and "questionKey" in quiz_submission:
-                # Fallback to key if quiz is purely dynamic
-                auth_questions = quiz_submission.get("questionKey") or []
+            auth_questions = quiz_submission.get("questionKey") or get_quiz_questions(course_id, quiz_id, course_def) or []
 
             if auth_questions:
                 total_q = len(auth_questions)
@@ -327,7 +324,7 @@ def save_user_course_progress(user_id: str, course_id: str, progress_data: Dict[
 
         if sub_id not in processed_quiz_subs:
             final_cat = course_cat.get("finalAssessment") or {}
-            auth_questions = final_cat.get("questions") or final_sub.get("questionKey") or []
+            auth_questions = final_sub.get("questionKey") or final_cat.get("questions") or []
 
             if auth_questions:
                 total_q = len(auth_questions)
@@ -423,6 +420,7 @@ def save_user_course_progress(user_id: str, course_id: str, progress_data: Dict[
         "finalAssessment": existing_final,
         "lessonTimeSpent": existing_lesson_time,
         "lastAccessed": progress_data.get("lastAccessed") or existing_record.get("lastAccessed") or {},
+        "courseDefinition": course_def,
         "totalRequiredItems": total_required_items,
         "completionPercentage": completion_percentage,
         "certificateEligible": certificate_eligible,
@@ -457,19 +455,78 @@ def validate_certificate_eligibility(user_id: str, course_id: str) -> Dict[str, 
     if not record:
         return {"eligible": False, "reason": "No verified progress record found for this course.", "progress": None}
 
-    completion = record.get("completionPercentage", 0)
-    final = record.get("finalAssessment") or {}
-    final_passed = bool(final.get("passed", False))
+    course_def = record.get("courseDefinition")
+    course_cat = get_course_catalog_entry(course_id, course_def)
+    item_reqs = get_course_item_requirements(course_id, course_def)
+    total_required_items = get_course_total_required_items(course_id, course_def)
+    passing_score = int(course_cat.get("passingScore", DEFAULT_PASSING_SCORE))
+
+    completed_item_ids = set(record.get("completedItemIds", []) or [])
+    quiz_scores = dict(record.get("quizScores", {}) or {})
+    final = dict(record.get("finalAssessment", {}) or {})
+    lesson_time = dict(record.get("lessonTimeSpent", {}) or {})
+
+    # Authoritative module completeness verification
+    modules = course_cat.get("modules", [])
+    all_modules_passed = True
+
+    for mod in modules:
+        mod_item_ids = [it["id"] for it in mod.get("items", []) if it.get("required", True)]
+        for iid in mod_item_ids:
+            if iid not in completed_item_ids:
+                req = item_reqs.get(iid, {})
+                itype = req.get("type", "READING")
+                if itype == "QUIZ":
+                    q = quiz_scores.get(iid, {})
+                    if q.get("passed") and int(q.get("score", 0)) >= passing_score:
+                        completed_item_ids.add(iid)
+                    else:
+                        all_modules_passed = False
+                else:
+                    req_dur = int(req.get("requiredDurationSeconds", DEFAULT_REQUIRED_DURATION_SECONDS))
+                    if int(lesson_time.get(iid, 0)) >= req_dur:
+                        completed_item_ids.add(iid)
+                    else:
+                        all_modules_passed = False
+            else:
+                req = item_reqs.get(iid, {})
+                if req.get("type") == "QUIZ":
+                    q = quiz_scores.get(iid, {})
+                    if not (q.get("passed") and int(q.get("score", 0)) >= passing_score):
+                        all_modules_passed = False
+
+    final_passed = bool(final.get("passed", False)) and int(final.get("score", 0)) >= passing_score
     final_score = int(final.get("score", 0) or 0)
-    is_certified = bool(record.get("certificateEligible", False))
+
+    completion_percentage = 0
+    if total_required_items > 0:
+        completion_percentage = min(100, int((len(completed_item_ids) / total_required_items) * 100))
+
+    is_certified = bool(all_modules_passed and final_passed and (completion_percentage == 100))
+
+    # Sync back to record if state evolved
+    if (
+        record.get("certificateEligible") != is_certified or
+        record.get("completionPercentage") != completion_percentage or
+        record.get("totalRequiredItems") != total_required_items or
+        set(record.get("completedItemIds", [])) != completed_item_ids
+    ):
+        record["certificateEligible"] = is_certified
+        record["completionPercentage"] = completion_percentage
+        record["totalRequiredItems"] = total_required_items
+        record["completedItemIds"] = sorted(list(completed_item_ids))
+        record["updatedAt"] = datetime.utcnow().isoformat()
+        key = f"{str(user_id).strip().lower()}_{str(course_id).strip().lower()}"
+        course_progress_db[key] = record
+        _save_progress_to_disk()
 
     if not is_certified:
-        if completion < 100:
-            reason = f"Course is only {completion}% complete. All lessons and checkpoint quizzes must be completed."
+        if completion_percentage < 100:
+            reason = f"Course is only {completion_percentage}% complete. All lessons and checkpoint quizzes must be completed."
         elif not final_passed:
             reason = "Final comprehensive certification exam has not been passed yet."
-        elif final_score < 70:
-            reason = f"Final exam score ({final_score}%) is below the 70% passing threshold."
+        elif final_score < passing_score:
+            reason = f"Final exam score ({final_score}%) is below the {passing_score}% passing threshold."
         else:
             reason = "Certificate requirements not fully met."
     else:
@@ -479,11 +536,11 @@ def validate_certificate_eligibility(user_id: str, course_id: str) -> Dict[str, 
         "eligible": is_certified,
         "reason": reason,
         "progress": {
-            "completionPercentage": completion,
+            "completionPercentage": completion_percentage,
             "finalAssessmentPassed": final_passed,
             "finalAssessmentScore": final_score,
-            "completedItems": len(record.get("completedItemIds", [])),
-            "totalItems": record.get("totalRequiredItems", 0)
+            "completedItems": len(completed_item_ids),
+            "totalItems": total_required_items
         }
     }
 

@@ -132,3 +132,29 @@
   - Eliminated `random.choice` / `random.uniform` from `ml-services/emotion-detection/emotion_service.py` and replaced with deterministic, objective visual engagement and quality metrics.
   - Automated E2E test suite: `test_phase10_e2e_lifecycle.py` (14-stage end-to-end integration test).
   - Automated emotion determinism suite: `test_emotion_analysis.py` (32 tests).
+
+---
+
+### Phase 11 — Dynamic Evidence-Grounded Career Roadmap & Milestone Progression
+- **Status:** **COMPLETED, TESTED & FRONTEND INTEGRATED**
+- **Objective:** Provide personalized, evidence-grounded multi-domain career roadmaps with deterministic readiness scoring, progressive milestone unlocking, and state persistence.
+- **Scope & Changes Implemented:**
+  - Implemented `career_roadmap_service.py` with multi-domain role catalogs (Technology, Data, HR, Marketing, Finance, Sales, Design) and deterministic readiness score derivation.
+  - Implemented authenticated REST endpoints in `career_routes.py` (`GET /api/career/roadmap`, `POST /api/career/roadmap/target-role`, `POST /api/career/roadmap/milestone/{id}/complete`, `GET /api/career/roadmap/domains`).
+  - Added persistence in `career_roadmaps.json` with multi-tenant isolation.
+  - Integrated `CareerRoadmap.jsx` with backend API via `frontend/src/utils/api.js` while preserving 100% of UI design and layout.
+  - Automated test suite: `test_phase11_career_roadmap.py` (22 tests).
+
+---
+
+### Phase 21 — Certificate Eligibility Bug Fix & Academic Parity
+- **Status:** **COMPLETED, TESTED & FRONTEND/BACKEND VERIFIED**
+- **Objective:** Fix root-cause schema mismatch where 39-item curricula (7 modules x 4 lessons + 1 module x 3 lessons + 8 checkpoint quizzes) were miscalculated as 40 items by backend fallback generator, causing 100% completed courses with passed final exams to remain locked at 97%.
+- **Scope & Changes Implemented:**
+  - Fixed `course_catalog_service.py` dynamic fallback generator to correctly generate 39 module items matching `curriculumFactory.js` (Module 8 Capstone has 3 lessons, not 4).
+  - Enhanced `course_catalog_service.py` to parse both `items` objects and `itemIds` string lists from `courseDefinition`.
+  - Updated `CoursePlayer.jsx` to pass complete module items and final assessment structures in `courseProgressDefinition`.
+  - Hardened `validate_certificate_eligibility` in `engagement_service.py` to perform independent curriculum verification against real dwell times, quiz passing scores ($\ge 70\%$), and final comprehensive exams ($\ge 70\%$).
+  - Automated test suite: `test_phase21_certificate_eligibility.py` (12 tests covering Tests A through L).
+  - Automated Playwright E2E suite: `phase21_certificate_eligibility.spec.js`.
+

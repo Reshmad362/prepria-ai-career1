@@ -847,6 +847,32 @@ export const getQuestionsForRole = (roleName, difficulty = "Intermediate", inter
 };
 
 /**
+ * Helper to detect fillers in client-side fallback
+ */
+export const detectFillersClient = (text = "") => {
+  if (!text) return { filler_count: 0, fillers: [], filler_breakdown: {} };
+  const fillerRegex = /\b(um+|uh+|mm+|hmm+|like|basically|actually|you know|kind of|sort of)\b/gi;
+  const matches = text.match(fillerRegex) || [];
+  const fillers = matches.map(m => {
+    const low = m.toLowerCase();
+    if (/^um+$/.test(low)) return "um";
+    if (/^uh+$/.test(low)) return "uh";
+    if (/^mm+$/.test(low)) return "mm";
+    if (/^hmm+$/.test(low)) return "hmm";
+    return low;
+  });
+  const breakdown = {};
+  fillers.forEach(w => {
+    breakdown[w] = (breakdown[w] || 0) + 1;
+  });
+  return {
+    filler_count: fillers.length,
+    fillers,
+    filler_breakdown: breakdown
+  };
+};
+
+/**
  * Calculates authentic 5-pillar scorecard and feedback evaluation
  */
 export const evaluateInterviewSubmission = ({
@@ -861,16 +887,32 @@ export const evaluateInterviewSubmission = ({
   let validAnswerCount = 0;
   const questionEvaluations = [];
 
+  let totalFillers = 0;
+  const aggregateFillerBreakdown = {};
+  let totalSpokenWords = 0;
+  let totalSpeakingDuration = 0;
+
   answers.forEach((ansObj, idx) => {
     const rawText = typeof ansObj === 'string' ? ansObj : (ansObj?.transcript || ansObj?.text || "");
     const qItem = questions[idx] || {};
     const isSkipped = rawText === "[Skipped]" || ansObj?.status === 'skipped';
     const trimmed = rawText.replace("[Skipped]", "").trim();
+    const ansDuration = (typeof ansObj === 'object' && ansObj?.answerDurationSeconds) ? Number(ansObj.answerDurationSeconds) : 0;
 
     if (trimmed.length > 5 && !isSkipped) {
       const words = trimmed.split(/\s+/).filter(Boolean);
       totalLength += words.length;
       validAnswerCount += 1;
+      totalSpokenWords += words.length;
+      totalSpeakingDuration += ansDuration;
+
+      const fillerData = detectFillersClient(trimmed);
+      totalFillers += fillerData.filler_count;
+      Object.entries(fillerData.filler_breakdown).forEach(([w, c]) => {
+        aggregateFillerBreakdown[w] = (aggregateFillerBreakdown[w] || 0) + c;
+      });
+
+      const qWpm = ansDuration > 0 && words.length > 0 ? Math.round((words.length / (ansDuration / 60.0)) * 10) / 10 : null;
 
       // Question-specific score
       const qLengthScore = Math.min(100, Math.round(words.length * 2.5));
@@ -885,7 +927,16 @@ export const evaluateInterviewSubmission = ({
         score: qScore,
         wordCount: words.length,
         hasSTARStructure,
-        status: "answered"
+        status: "answered",
+        speech_analysis: {
+          filler_count: fillerData.filler_count,
+          fillers: fillerData.fillers,
+          filler_breakdown: fillerData.filler_breakdown,
+          wpm: qWpm,
+          words: words.length,
+          duration_seconds: ansDuration,
+          fluency_score: Math.max(0, 100 - (fillerData.filler_count * 5))
+        }
       });
     } else {
       questionEvaluations.push({
@@ -896,13 +947,21 @@ export const evaluateInterviewSubmission = ({
         score: 0,
         wordCount: 0,
         hasSTARStructure: false,
-        status: isSkipped ? "skipped" : "unanswered"
+        status: isSkipped ? "skipped" : "unanswered",
+        speech_analysis: {
+          filler_count: 0,
+          fillers: [],
+          filler_breakdown: {},
+          wpm: null,
+          words: 0,
+          duration_seconds: 0,
+          fluency_score: 100
+        }
       });
     }
   });
 
   // ZERO-ANSWER PROTECTION:
-  // If zero valid answers were provided, return invalid evaluation
   if (validAnswerCount === 0) {
     return {
       isValid: false,
@@ -916,6 +975,17 @@ export const evaluateInterviewSubmission = ({
         communication: 0,
         roleKnowledge: 0,
         confidence: 0
+      },
+      speech_metrics: {
+        total_filler_count: 0,
+        filler_breakdown: {},
+        filler_rate: null,
+        words_per_minute: null,
+        total_words: 0,
+        speaking_duration_seconds: 0,
+        pause_count: 0,
+        long_pauses: 0,
+        speech_observations: ["No speech detected for evaluation."]
       },
       questionEvaluations,
       strengths: [],
@@ -972,6 +1042,52 @@ export const evaluateInterviewSubmission = ({
     }
   ];
 
+  const sortedFillerBreakdown = Object.fromEntries(
+    Object.entries(aggregateFillerBreakdown).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+  );
+
+  const aggregateWpm = totalSpeakingDuration > 0 && totalSpokenWords > 0 
+    ? Math.round((totalSpokenWords / (totalSpeakingDuration / 60.0)) * 10) / 10 
+    : null;
+
+  const fillerRate = totalSpokenWords > 0
+    ? Math.round((totalFillers / totalSpokenWords) * 1000) / 10
+    : null;
+
+  const speechObservations = [];
+  if (totalFillers === 0 && totalSpokenWords > 0) {
+    speechObservations.push("Excellent speech clarity with zero filler words detected.");
+  } else if (totalFillers > 0) {
+    const topEntry = Object.entries(sortedFillerBreakdown)[0];
+    if (topEntry) {
+      speechObservations.push(
+        `Your most frequent filler was '${topEntry[0]}' (${topEntry[1]} occurrence${topEntry[1] > 1 ? 's' : ''}). Practice replacing it with a deliberate short pause.`
+      );
+    }
+  }
+
+  if (aggregateWpm !== null) {
+    if (aggregateWpm > 165) {
+      speechObservations.push(`Speaking rate was fast (${aggregateWpm} WPM). Aim for 120–150 WPM for maximum clarity and executive presence.`);
+    } else if (aggregateWpm < 95) {
+      speechObservations.push(`Speaking rate was slow (${aggregateWpm} WPM). Practice structuring responses to maintain steady momentum.`);
+    } else {
+      speechObservations.push(`Speaking pace is optimal (${aggregateWpm} WPM) within the conversational executive range.`);
+    }
+  }
+
+  const sessionSpeechMetrics = {
+    total_filler_count: totalFillers,
+    filler_breakdown: sortedFillerBreakdown,
+    filler_rate: fillerRate,
+    words_per_minute: aggregateWpm,
+    total_words: totalSpokenWords,
+    speaking_duration_seconds: totalSpeakingDuration,
+    pause_count: 0,
+    long_pauses: 0,
+    speech_observations: speechObservations
+  };
+
   return {
     isValid: true,
     isCompleted: isFullyCompleted,
@@ -986,6 +1102,7 @@ export const evaluateInterviewSubmission = ({
       roleKnowledge: baseRoleKnowledge,
       confidence: baseConfidence
     },
+    speech_metrics: sessionSpeechMetrics,
     questionEvaluations,
     strengths,
     improvements,
@@ -993,3 +1110,4 @@ export const evaluateInterviewSubmission = ({
     completedAt: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
   };
 };
+

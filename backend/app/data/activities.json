@@ -208,5 +208,632 @@
     },
     "date": "2026-09-23",
     "id": "act_10_1790134392"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "ASSESSMENT_COMPLETED",
+    "title": "Passed 2. Modern JavaScript ES6+ & Asynchronous Mechanics \u2014 Checkpoint Assessment (100%)",
+    "duration_minutes": 15,
+    "timestamp": "2026-09-30T17:27:18.395252",
+    "metadata": {
+      "course_id": "tech-101",
+      "score": 100,
+      "is_final": false
+    },
+    "date": "2026-09-30",
+    "id": "act_11_1790769438"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "LESSON_COMPLETED",
+    "title": "Completed Virtual DOM Reconciliation & Fiber Trees",
+    "duration_minutes": 1,
+    "timestamp": "2026-09-30T17:28:00.005984",
+    "metadata": {
+      "course_id": "tech-101",
+      "item_id": "tech-101-m3-l1",
+      "type": "READING",
+      "skills": [
+        "React",
+        "Next.js",
+        "Server Components",
+        "State Management",
+        "TypeScript",
+        "Performance",
+        "Zustand"
+      ]
+    },
+    "date": "2026-09-30",
+    "id": "act_12_1790769480"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "LESSON_COMPLETED",
+    "title": "Completed State Immutability & Pure Functions",
+    "duration_minutes": 1,
+    "timestamp": "2026-09-30T17:29:03.704175",
+    "metadata": {
+      "course_id": "tech-101",
+      "item_id": "tech-101-m3-l2",
+      "type": "READING",
+      "skills": [
+        "React",
+        "Next.js",
+        "Server Components",
+        "State Management",
+        "TypeScript",
+        "Performance",
+        "Zustand"
+      ]
+    },
+    "date": "2026-09-30",
+    "id": "act_13_1790769543"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "LESSON_COMPLETED",
+    "title": "Completed Custom Hooks for Logic Reuse",
+    "duration_minutes": 1,
+    "timestamp": "2026-09-30T17:30:06.074383",
+    "metadata": {
+      "course_id": "tech-101",
+      "item_id": "tech-101-m3-l3",
+      "type": "PRACTICAL",
+      "skills": [
+        "React",
+        "Next.js",
+        "Server Components",
+        "State Management",
+        "TypeScript",
+        "Performance",
+        "Zustand"
+      ]
+    },
+    "date": "2026-09-30",
+    "id": "act_14_1790769606"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "LESSON_COMPLETED",
+    "title": "Completed Controlled vs Uncontrolled Forms",
+    "duration_minutes": 1,
+    "timestamp": "2026-09-30T17:31:46.002339",
+    "metadata": {
+      "course_id": "tech-101",
+      "item_id": "tech-101-m3-l4",
+      "type": "PRACTICAL",
+      "skills": [
+        "React",
+        "Next.js",
+        "Server Components",
+        "State Management",
+        "TypeScript",
+        "Performance",
+        "Zustand"
+      ]
+    },
+    "date": "2026-09-30",
+    "id": "act_15_1790769706"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "ASSESSMENT_COMPLETED",
+    "title": "Passed 3. Component Architecture & React Primitives \u2014 Checkpoint Assessment (86%)",
+    "duration_minutes": 15,
+    "timestamp": "2026-09-30T17:32:07.051311",
+    "metadata": {
+      "course_id": "tech-101",
+      "score": 86,
+      "is_final": false
+    },
+    "date": "2026-09-30",
+    "id": "act_16_1790769727"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "LESSON_COMPLETED",
+    "title": "Completed Context API Bottlenecks & Selector Subscriptions",
+    "duration_minutes": 1,
+    "timestamp": "2026-09-30T17:33:14.780716",
+    "metadata": {
+      "course_id": "tech-101",
+      "item_id": "tech-101-m4-l1",
+      "type": "READING",
+      "skills": [
+        "React",
+        "Next.js",
+        "Server Components",
+        "State Management",
+        "TypeScript",
+        "Performance",
+        "Zustand"
+      ]
+    },
+    "date": "2026-09-30",
+    "id": "act_17_1790769794"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "LESSON_COMPLETED",
+    "title": "Completed Atomic Stores with Zustand",
+    "duration_minutes": 1,
+    "timestamp": "2026-09-30T17:34:18.218078",
+    "metadata": {
+      "course_id": "tech-101",
+      "item_id": "tech-101-m4-l2",
+      "type": "READING",
+      "skills": [
+        "React",
+        "Next.js",
+        "Server Components",
+        "State Management",
+        "TypeScript",
+        "Performance",
+        "Zustand"
+      ]
+    },
+    "date": "2026-09-30",
+    "id": "act_18_1790769858"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "LESSON_COMPLETED",
+    "title": "Completed Redux Toolkit Slices & Thunks",
+    "duration_minutes": 1,
+    "timestamp": "2026-09-30T17:35:39.865352",
+    "metadata": {
+      "course_id": "tech-101",
+      "item_id": "tech-101-m4-l3",
+      "type": "PRACTICAL",
+      "skills": [
+        "React",
+        "Next.js",
+        "Server Components",
+        "State Management",
+        "TypeScript",
+        "Performance",
+        "Zustand"
+      ]
+    },
+    "date": "2026-09-30",
+    "id": "act_19_1790769939"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "LESSON_COMPLETED",
+    "title": "Completed TanStack Query Cache Invalidation",
+    "duration_minutes": 1,
+    "timestamp": "2026-09-30T17:36:42.038355",
+    "metadata": {
+      "course_id": "tech-101",
+      "item_id": "tech-101-m4-l4",
+      "type": "PRACTICAL",
+      "skills": [
+        "React",
+        "Next.js",
+        "Server Components",
+        "State Management",
+        "TypeScript",
+        "Performance",
+        "Zustand"
+      ]
+    },
+    "date": "2026-09-30",
+    "id": "act_20_1790770002"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "ASSESSMENT_COMPLETED",
+    "title": "Passed 4. State Management & Server Cache Synchronization \u2014 Checkpoint Assessment (86%)",
+    "duration_minutes": 15,
+    "timestamp": "2026-09-30T17:37:00.129940",
+    "metadata": {
+      "course_id": "tech-101",
+      "score": 86,
+      "is_final": false
+    },
+    "date": "2026-09-30",
+    "id": "act_21_1790770020"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "LESSON_COMPLETED",
+    "title": "Completed Generics in Reusable UI Components",
+    "duration_minutes": 1,
+    "timestamp": "2026-09-30T17:38:07.647889",
+    "metadata": {
+      "course_id": "tech-101",
+      "item_id": "tech-101-m5-l1",
+      "type": "READING",
+      "skills": [
+        "React",
+        "Next.js",
+        "Server Components",
+        "State Management",
+        "TypeScript",
+        "Performance",
+        "Zustand"
+      ]
+    },
+    "date": "2026-09-30",
+    "id": "act_22_1790770087"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "LESSON_COMPLETED",
+    "title": "Completed Discriminated Unions for UI State Modeling",
+    "duration_minutes": 1,
+    "timestamp": "2026-09-30T17:39:22.563645",
+    "metadata": {
+      "course_id": "tech-101",
+      "item_id": "tech-101-m5-l2",
+      "type": "READING",
+      "skills": [
+        "React",
+        "Next.js",
+        "Server Components",
+        "State Management",
+        "TypeScript",
+        "Performance",
+        "Zustand"
+      ]
+    },
+    "date": "2026-09-30",
+    "id": "act_23_1790770162"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "LESSON_COMPLETED",
+    "title": "Completed Utility Types (Partial, Pick, Omit, Record)",
+    "duration_minutes": 1,
+    "timestamp": "2026-09-30T17:40:36.336274",
+    "metadata": {
+      "course_id": "tech-101",
+      "item_id": "tech-101-m5-l3",
+      "type": "PRACTICAL",
+      "skills": [
+        "React",
+        "Next.js",
+        "Server Components",
+        "State Management",
+        "TypeScript",
+        "Performance",
+        "Zustand"
+      ]
+    },
+    "date": "2026-09-30",
+    "id": "act_24_1790770236"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "LESSON_COMPLETED",
+    "title": "Completed Strict TypeScript Compiler Configurations",
+    "duration_minutes": 1,
+    "timestamp": "2026-09-30T17:41:38.163851",
+    "metadata": {
+      "course_id": "tech-101",
+      "item_id": "tech-101-m5-l4",
+      "type": "PRACTICAL",
+      "skills": [
+        "React",
+        "Next.js",
+        "Server Components",
+        "State Management",
+        "TypeScript",
+        "Performance",
+        "Zustand"
+      ]
+    },
+    "date": "2026-09-30",
+    "id": "act_25_1790770298"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "ASSESSMENT_COMPLETED",
+    "title": "Passed 5. Type Safety with TypeScript in UI Applications \u2014 Checkpoint Assessment (100%)",
+    "duration_minutes": 15,
+    "timestamp": "2026-09-30T17:41:54.746284",
+    "metadata": {
+      "course_id": "tech-101",
+      "score": 100,
+      "is_final": false
+    },
+    "date": "2026-09-30",
+    "id": "act_26_1790770314"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "LESSON_COMPLETED",
+    "title": "Completed Taming Core Web Vitals (LCP, INP, CLS)",
+    "duration_minutes": 1,
+    "timestamp": "2026-09-30T17:43:02.003173",
+    "metadata": {
+      "course_id": "tech-101",
+      "item_id": "tech-101-m6-l1",
+      "type": "READING",
+      "skills": [
+        "React",
+        "Next.js",
+        "Server Components",
+        "State Management",
+        "TypeScript",
+        "Performance",
+        "Zustand"
+      ]
+    },
+    "date": "2026-09-30",
+    "id": "act_27_1790770382"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "LESSON_COMPLETED",
+    "title": "Completed Route & Component Code Splitting with React.lazy",
+    "duration_minutes": 1,
+    "timestamp": "2026-09-30T17:44:03.907361",
+    "metadata": {
+      "course_id": "tech-101",
+      "item_id": "tech-101-m6-l2",
+      "type": "READING",
+      "skills": [
+        "React",
+        "Next.js",
+        "Server Components",
+        "State Management",
+        "TypeScript",
+        "Performance",
+        "Zustand"
+      ]
+    },
+    "date": "2026-09-30",
+    "id": "act_28_1790770443"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "LESSON_COMPLETED",
+    "title": "Completed Optimizing Interaction to Next Paint (INP)",
+    "duration_minutes": 1,
+    "timestamp": "2026-09-30T17:45:08.791711",
+    "metadata": {
+      "course_id": "tech-101",
+      "item_id": "tech-101-m6-l3",
+      "type": "PRACTICAL",
+      "skills": [
+        "React",
+        "Next.js",
+        "Server Components",
+        "State Management",
+        "TypeScript",
+        "Performance",
+        "Zustand"
+      ]
+    },
+    "date": "2026-09-30",
+    "id": "act_29_1790770508"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "LESSON_COMPLETED",
+    "title": "Completed Chrome DevTools Flame Graphs & Memory Leaks",
+    "duration_minutes": 1,
+    "timestamp": "2026-09-30T17:46:11.372204",
+    "metadata": {
+      "course_id": "tech-101",
+      "item_id": "tech-101-m6-l4",
+      "type": "PRACTICAL",
+      "skills": [
+        "React",
+        "Next.js",
+        "Server Components",
+        "State Management",
+        "TypeScript",
+        "Performance",
+        "Zustand"
+      ]
+    },
+    "date": "2026-09-30",
+    "id": "act_30_1790770571"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "ASSESSMENT_COMPLETED",
+    "title": "Passed 6. Performance Optimization & Core Web Vitals \u2014 Checkpoint Assessment (100%)",
+    "duration_minutes": 15,
+    "timestamp": "2026-09-30T17:46:26.289538",
+    "metadata": {
+      "course_id": "tech-101",
+      "score": 100,
+      "is_final": false
+    },
+    "date": "2026-09-30",
+    "id": "act_31_1790770586"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "LESSON_COMPLETED",
+    "title": "Completed Testing User Interactions with React Testing Library",
+    "duration_minutes": 1,
+    "timestamp": "2026-09-30T17:47:31.435746",
+    "metadata": {
+      "course_id": "tech-101",
+      "item_id": "tech-101-m7-l1",
+      "type": "READING",
+      "skills": [
+        "React",
+        "Next.js",
+        "Server Components",
+        "State Management",
+        "TypeScript",
+        "Performance",
+        "Zustand"
+      ]
+    },
+    "date": "2026-09-30",
+    "id": "act_32_1790770651"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "LESSON_COMPLETED",
+    "title": "Completed Mock Service Worker (MSW) Network Mocking",
+    "duration_minutes": 1,
+    "timestamp": "2026-09-30T17:48:36.832073",
+    "metadata": {
+      "course_id": "tech-101",
+      "item_id": "tech-101-m7-l2",
+      "type": "READING",
+      "skills": [
+        "React",
+        "Next.js",
+        "Server Components",
+        "State Management",
+        "TypeScript",
+        "Performance",
+        "Zustand"
+      ]
+    },
+    "date": "2026-09-30",
+    "id": "act_33_1790770716"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "LESSON_COMPLETED",
+    "title": "Completed Keyboard Navigation & Focus Traps in Modals",
+    "duration_minutes": 1,
+    "timestamp": "2026-09-30T17:49:41.197360",
+    "metadata": {
+      "course_id": "tech-101",
+      "item_id": "tech-101-m7-l3",
+      "type": "PRACTICAL",
+      "skills": [
+        "React",
+        "Next.js",
+        "Server Components",
+        "State Management",
+        "TypeScript",
+        "Performance",
+        "Zustand"
+      ]
+    },
+    "date": "2026-09-30",
+    "id": "act_34_1790770781"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "LESSON_COMPLETED",
+    "title": "Completed Automated Accessibility Audits with axe-core",
+    "duration_minutes": 1,
+    "timestamp": "2026-09-30T17:50:43.876965",
+    "metadata": {
+      "course_id": "tech-101",
+      "item_id": "tech-101-m7-l4",
+      "type": "PRACTICAL",
+      "skills": [
+        "React",
+        "Next.js",
+        "Server Components",
+        "State Management",
+        "TypeScript",
+        "Performance",
+        "Zustand"
+      ]
+    },
+    "date": "2026-09-30",
+    "id": "act_35_1790770843"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "ASSESSMENT_COMPLETED",
+    "title": "Passed 7. Automated UI Testing & Accessibility (a11y) \u2014 Checkpoint Assessment (100%)",
+    "duration_minutes": 15,
+    "timestamp": "2026-09-30T17:51:01.002958",
+    "metadata": {
+      "course_id": "tech-101",
+      "score": 100,
+      "is_final": false
+    },
+    "date": "2026-09-30",
+    "id": "act_36_1790770861"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "LESSON_COMPLETED",
+    "title": "Completed React Server Components vs Client Boundaries",
+    "duration_minutes": 1,
+    "timestamp": "2026-09-30T17:52:48.666089",
+    "metadata": {
+      "course_id": "tech-101",
+      "item_id": "tech-101-m8-l1",
+      "type": "READING",
+      "skills": [
+        "React",
+        "Next.js",
+        "Server Components",
+        "State Management",
+        "TypeScript",
+        "Performance",
+        "Zustand"
+      ]
+    },
+    "date": "2026-09-30",
+    "id": "act_37_1790770968"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "LESSON_COMPLETED",
+    "title": "Completed Type-Safe Server Actions & Mutations",
+    "duration_minutes": 1,
+    "timestamp": "2026-09-30T17:53:53.213124",
+    "metadata": {
+      "course_id": "tech-101",
+      "item_id": "tech-101-m8-l2",
+      "type": "READING",
+      "skills": [
+        "React",
+        "Next.js",
+        "Server Components",
+        "State Management",
+        "TypeScript",
+        "Performance",
+        "Zustand"
+      ]
+    },
+    "date": "2026-09-30",
+    "id": "act_38_1790771033"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "LESSON_COMPLETED",
+    "title": "Completed Deploying Enterprise Dashboard Capstone",
+    "duration_minutes": 1,
+    "timestamp": "2026-09-30T17:54:55.429740",
+    "metadata": {
+      "course_id": "tech-101",
+      "item_id": "tech-101-m8-l3",
+      "type": "PRACTICAL",
+      "skills": [
+        "React",
+        "Next.js",
+        "Server Components",
+        "State Management",
+        "TypeScript",
+        "Performance",
+        "Zustand"
+      ]
+    },
+    "date": "2026-09-30",
+    "id": "act_39_1790771095"
+  },
+  {
+    "user_id": "reshmad362@gmail.com",
+    "activity_type": "ASSESSMENT_COMPLETED",
+    "title": "Passed 8. Enterprise Next.js App Router Capstone \u2014 Checkpoint Assessment (100%)",
+    "duration_minutes": 15,
+    "timestamp": "2026-09-30T17:55:10.746363",
+    "metadata": {
+      "course_id": "tech-101",
+      "score": 100,
+      "is_final": false
+    },
+    "date": "2026-09-30",
+    "id": "act_40_1790771110"
   }
 ]

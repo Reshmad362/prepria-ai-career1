@@ -18,6 +18,7 @@ import {
   hydrateProgressFromBackend,
   DEFAULT_REQUIRED_DURATION_SECONDS
 } from '../utils/engagementService';
+import { randomizeQuizQuestions } from '../utils/quizUtils';
 
 export default function CoursePlayer() {
   const { courseId } = useParams();
@@ -89,6 +90,14 @@ export default function CoursePlayer() {
       const items = Array.isArray(mod.items) ? mod.items : (Array.isArray(mod.lessons) ? mod.lessons : []);
       return {
         moduleIndex: mIdx,
+        id: mod.id || `${course.id}-mod-${mIdx + 1}`,
+        title: mod.title,
+        items: items.map(it => ({
+          id: it.id,
+          type: it.type || (it.id?.includes('quiz') ? 'QUIZ' : 'READING'),
+          requiredDurationSeconds: it.requiredDurationSeconds || DEFAULT_REQUIRED_DURATION_SECONDS,
+          required: it.required !== false
+        })),
         itemIds: items.map(it => it.id).filter(Boolean),
         checkpointQuizId: items.find(it => it.type === 'QUIZ')?.id || null
       };
@@ -98,8 +107,10 @@ export default function CoursePlayer() {
 
     return {
       courseId: course.id,
+      title: course.title,
       passingScore: course.passingScore || 70,
       finalAssessmentId: course.finalAssessment?.id || null,
+      finalAssessment: course.finalAssessment || null,
       totalRequiredItems,
       modules: modulesDefinition,
       itemRequirements
@@ -202,6 +213,17 @@ export default function CoursePlayer() {
   const currentStep = allSteps[activeStepIndex] || allSteps[0] || {};
   const requiredDuration = currentStep.requiredDurationSeconds || DEFAULT_REQUIRED_DURATION_SECONDS;
 
+  // Active attempt counter and randomized questions per quiz step/retake
+  const [quizAttemptCount, setQuizAttemptCount] = useState(0);
+  const activeQuizQuestions = useMemo(() => {
+    if (!currentStep || (currentStep.type !== "QUIZ" && !currentStep.isFinal)) {
+      return [];
+    }
+    const rawQuestions = currentStep.quiz?.questions || currentStep.questions || [];
+    if (!rawQuestions.length) return [];
+    return randomizeQuizQuestions(rawQuestions);
+  }, [currentStep?.id, quizAttemptCount]);
+
   // Keep refs in sync
   useEffect(() => { progressRecordRef.current = progressRecord; }, [progressRecord]);
   useEffect(() => { isTabActiveRef.current = isTabActive; }, [isTabActive]);
@@ -266,6 +288,10 @@ export default function CoursePlayer() {
               itemId: currentStep.id,
               deltaSeconds: 5
             },
+            lessonTimeSpent: {
+              ...(rec.lessonTimeSpent || {}),
+              [currentStep.id]: next
+            },
             lastAccessed: { moduleId: currentStep.moduleId, itemId: currentStep.id }
           };
           saveCourseProgressRecord(course.id, updated, email);
@@ -284,6 +310,7 @@ export default function CoursePlayer() {
     setQuizAnswers({});
     setQuizResult(null);
     setQuizError("");
+    setQuizAttemptCount(0);
     setPracticalCompleted(false);
     setPracticalNotes("");
     if (currentStep?.moduleIndex !== undefined) {
@@ -302,25 +329,32 @@ export default function CoursePlayer() {
   const isTimeRequirementMet = timeSpentSeconds >= requiredDuration;
 
   // Handle Mark as Complete for Reading, Video, Code, Practical
-  const handleMarkItemComplete = async () => {
-    if (!currentStep.id || !isCurrentUnlocked) return;
+  const handleMarkItemComplete = async (silent = false) => {
+    if (!currentStep.id || !isCurrentUnlocked) return false;
     if (!isTimeRequirementMet) {
-      alert(`Please engage with this lesson for at least ${requiredDuration} seconds before marking complete.`);
-      return;
+      if (!silent) {
+        alert(`Please engage with this lesson for at least ${requiredDuration} seconds before marking complete.`);
+      }
+      return false;
     }
 
-    const newCompleted = Array.from(new Set([...(progressRecord.completedItemIds || []), currentStep.id]));
+    const currentSpent = Math.max(timeSpentRef.current, requiredDuration);
+    const newCompleted = Array.from(new Set([...(progressRecordRef.current?.completedItemIds || []), currentStep.id]));
     const updatedRecord = {
-      ...progressRecord,
+      ...progressRecordRef.current,
       totalRequiredItems: totalRequiredItemsRef.current,
       courseDefinition: courseProgressDefinitionRef.current,
       completedItemIds: newCompleted,
       lessonTimeSpent: {
-        ...(progressRecord.lessonTimeSpent || {}),
-        [currentStep.id]: timeSpentSeconds
+        ...(progressRecordRef.current?.lessonTimeSpent || {}),
+        [currentStep.id]: currentSpent
       },
       lastAccessed: { moduleId: currentStep.moduleId, itemId: currentStep.id }
     };
+
+    setProgressRecord(updatedRecord);
+    progressRecordRef.current = updatedRecord;
+    setActionState(getCourseActionState(course, email));
 
     const saved = await saveCourseProgressRecord(course.id, updatedRecord, email);
     const nextRecord = saved || updatedRecord;
@@ -331,7 +365,7 @@ export default function CoursePlayer() {
     await recordLearningActivity({
       activityType: "LESSON_COMPLETED",
       title: `Completed ${currentStep.title}`,
-      durationMinutes: Math.max(1, Math.round(timeSpentSeconds / 60)),
+      durationMinutes: Math.max(1, Math.round(currentSpent / 60)),
       metadata: {
         course_id: course.id,
         item_id: currentStep.id,
@@ -340,11 +374,53 @@ export default function CoursePlayer() {
       },
       userId: email
     });
+    return true;
+  };
+
+  // Handle Next Lesson Navigation with automatic progression upon satisfied dwell requirements
+  const handleNextLesson = async () => {
+    if (activeStepIndex >= allSteps.length - 1) return;
+    const nextIdx = activeStepIndex + 1;
+    const nextStep = allSteps[nextIdx];
+
+    const currentIsCompleted = (progressRecordRef.current?.completedItemIds || []).includes(currentStep.id) ||
+      (currentStep.isFinal && progressRecordRef.current?.finalAssessment?.passed);
+
+    // If current lesson is already completed, advance if next step is unlocked
+    if (currentIsCompleted) {
+      const state = getCourseActionState(course, email);
+      const isNextUnlocked = state.unlockedLessonIds?.has(nextStep.id) || (nextStep.isFinal && state.canAccessFinalAssessment);
+      if (isNextUnlocked) {
+        setActiveStepIndex(nextIdx);
+      } else {
+        alert("Please complete the current module requirements to unlock the next lesson.");
+      }
+      return;
+    }
+
+    // Quizzes and final assessments cannot be completed solely via timer
+    if (currentStep.type === "QUIZ" || currentStep.isFinal) {
+      alert("Please complete and pass the assessment before proceeding to the next lesson.");
+      return;
+    }
+
+    // For standard lessons with dwell time requirements (READING, VIDEO, CODE, PRACTICAL):
+    if (isTimeRequirementMet) {
+      const completed = await handleMarkItemComplete(true);
+      if (completed) {
+        setActiveStepIndex(nextIdx);
+      } else {
+        alert("Could not complete the lesson. Please ensure all requirements are met.");
+      }
+    } else {
+      const remainingSecs = Math.max(1, requiredDuration - timeSpentSeconds);
+      alert(`Please engage with this lesson for at least ${remainingSecs} more seconds before proceeding.`);
+    }
   };
 
   // Handle Quiz Submission
   const handleQuizSubmit = async (quizData, isFinal = false) => {
-    const questions = quizData.questions || [];
+    const questions = activeQuizQuestions.length > 0 ? activeQuizQuestions : (quizData.questions || []);
     if (questions.length === 0) return;
 
     // Verify all questions answered
@@ -840,7 +916,7 @@ export default function CoursePlayer() {
 
                 {/* Quiz Questions */}
                 <div className="space-y-6">
-                  {(currentStep.quiz?.questions || currentStep.questions || []).map((q, qIdx) => {
+                  {activeQuizQuestions.map((q, qIdx) => {
                     const selectedOpt = quizAnswers[q.id];
                     const isSubmitted = quizResult?.submitted;
 
@@ -914,6 +990,7 @@ export default function CoursePlayer() {
                         onClick={() => {
                           setQuizAnswers({});
                           setQuizResult(null);
+                          setQuizAttemptCount(c => c + 1);
                         }}
                         className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all cursor-pointer"
                       >
@@ -1160,16 +1237,7 @@ export default function CoursePlayer() {
 
               {activeStepIndex < allSteps.length - 1 ? (
                 <button
-                  onClick={() => {
-                    const nextIdx = activeStepIndex + 1;
-                    const nextStep = allSteps[nextIdx];
-                    const isNextUnlocked = actionState.unlockedLessonIds?.has(nextStep.id) || (nextStep.isFinal && actionState.canAccessFinalAssessment);
-                    if (isNextUnlocked) {
-                      setActiveStepIndex(nextIdx);
-                    } else {
-                      alert("Please complete the current lesson to unlock the next lesson.");
-                    }
-                  }}
+                  onClick={handleNextLesson}
                   className="px-5 py-2.5 rounded-xl bg-primary hover:bg-primaryHover text-white text-xs font-bold shadow-md shadow-primary/25 transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   <span>Next Lesson</span>

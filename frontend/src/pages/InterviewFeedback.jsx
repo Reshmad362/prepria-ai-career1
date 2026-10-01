@@ -3,12 +3,14 @@ import { UserContext } from '../contexts/UserContext';
 import { Link } from 'react-router-dom';
 import { Download, AlertCircle, CheckCircle2, XCircle, ChevronRight, Activity, Zap, Mic, Award, FileText, BookOpen } from 'lucide-react';
 import { coursesData } from '../data/coursesData';
+import { API_URL, downloadInterviewPdf } from '../utils/api';
 import './InterviewFeedback.css';
 
 export default function InterviewFeedback() {
   const { user } = useContext(UserContext);
   const [report, setReport] = useState(null);
   const [insights, setInsights] = useState(null);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
   useEffect(() => {
     if (user?.email) {
@@ -28,9 +30,36 @@ export default function InterviewFeedback() {
     }
   }, [user]);
 
-  const handlePrint = () => {
-    window.print();
+  const handleDownloadPdf = async () => {
+    try {
+      setIsDownloadingPdf(true);
+      const email = user?.email || localStorage.getItem('activeUser') || localStorage.getItem('userEmail');
+      let sid = report?.id || report?.sessionId;
+
+      if (!sid && email) {
+        const token = localStorage.getItem('token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const resp = await fetch(`${API_URL}/interview/history/${encodeURIComponent(email)}`, { headers });
+        if (resp.ok) {
+          const d = await resp.json();
+          if (d.data && d.data.length > 0) {
+            sid = d.data[0].id;
+          }
+        }
+      }
+
+      if (!sid) {
+        throw new Error("No session ID found for PDF generation.");
+      }
+
+      await downloadInterviewPdf(sid, email);
+    } catch (e) {
+      console.error("Failed to download PDF report:", e);
+    } finally {
+      setIsDownloadingPdf(false);
+    }
   };
+
 
   if (!report) {
     return (
@@ -118,11 +147,13 @@ export default function InterviewFeedback() {
             <p className="text-slate-400 mt-2">Role: {report.role} | Difficulty: {report.difficulty}</p>
           </div>
           <button 
-            onClick={handlePrint}
-            className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-xl font-bold hover:opacity-90 transition shadow-lg flex items-center gap-2"
+            onClick={handleDownloadPdf}
+            disabled={isDownloadingPdf}
+            className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-xl font-bold hover:opacity-90 transition shadow-lg flex items-center gap-2 disabled:opacity-60 cursor-pointer"
           >
-            <Download className="w-5 h-5" /> Download PDF
+            <Download className="w-5 h-5" /> {isDownloadingPdf ? "Generating PDF..." : "Download PDF"}
           </button>
+
         </header>
 
         {/* Print Only Header */}

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Body, Header
+from fastapi import APIRouter, HTTPException, Body, Header, Response
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 from datetime import datetime
@@ -15,10 +15,12 @@ from app.services.performance_tracker import (
     get_interview_by_id,
     get_longitudinal_comparison
 )
+from app.services.interview_report_pdf_service import generate_interview_pdf_report
 from app.services.engagement_service import record_user_activity
 from app.routes.auth_routes import get_current_user, verify_user_ownership, get_user_by_email_or_id
 
 router = APIRouter()
+
 
 class GenerateInterviewRequest(BaseModel):
     role: str
@@ -279,6 +281,7 @@ async def submit_interview_session(
                 "completedAt": datetime.utcnow().isoformat(),
                 "timestamp": datetime.utcnow().isoformat(),
                 "dimensions": evaluation.get("dimensions", {}),
+                "speech_metrics": evaluation.get("speech_metrics", {}),
                 "fluency_score": evaluation.get("dimensions", {}).get("communication", 80),
                 "emotion_confidence": float(evaluation.get("dimensions", {}).get("confidence", 80)) / 100.0,
                 "ats_score": 85,
@@ -382,5 +385,50 @@ async def get_longitudinal_comparison_endpoint(
         "success": True,
         "data": comparison
     }
+
+
+@router.get("/interview/report/{session_id}/pdf")
+@router.get("/api/interview/report/{session_id}/pdf")
+@router.get("/interview/report/{user_id}/{session_id}/pdf")
+@router.get("/api/interview/report/{user_id}/{session_id}/pdf")
+async def download_interview_report_pdf(
+    session_id: str,
+    user_id: Optional[str] = None,
+    authorization: Optional[str] = Header(None)
+):
+    """
+    Generates and returns an authoritative server-generated PDF performance evaluation report.
+    - Requires JWT authentication.
+    - Enforces strict user isolation: User A cannot download User B's report.
+    - Uses persisted evaluation and speech metrics from Phase 14 without DOM scraping.
+    """
+    current_user = get_current_user(authorization)
+    auth_user_key = current_user.get("email") or current_user.get("id")
+
+    # If user_id is explicitly provided in URL path, enforce ownership match
+    if user_id and not verify_user_ownership(user_id, current_user):
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to access another candidate's evaluation report.")
+
+    session = get_interview_by_id(auth_user_key, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Interview session evaluation not found.")
+
+    try:
+        pdf_bytes = generate_interview_pdf_report(session, user_identity=auth_user_key)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to generate interview PDF report.")
+
+    safe_session_id = re.sub(r'[^a-zA-Z0-9_\-]', '', str(session_id))
+    filename = f"prepria-interview-report-{safe_session_id}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-cache, no-store, must-revalidate"
+        }
+    )
+
 
 

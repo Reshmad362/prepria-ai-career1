@@ -6,14 +6,15 @@ import {
   Clock, ArrowRight, ShieldCheck, Sparkles, Award, TrendingUp, 
   RotateCcw, BookOpen, Compass, ChevronRight, Check, Volume2, 
   VolumeX, HelpCircle, StopCircle, RefreshCw, BarChart2, Video, 
-  VideoOff, Monitor, ShieldAlert, XCircle, AlertTriangle
+  VideoOff, Monitor, ShieldAlert, XCircle, AlertTriangle, FileText, Download
 } from 'lucide-react';
 import { 
   getQuestionsForRole, 
   evaluateInterviewSubmission 
 } from '../utils/interviewQuestionEngine';
 import { useInterviewProctoring } from '../hooks/useInterviewProctoring';
-import { API_URL } from '../utils/api';
+import { API_URL, downloadInterviewPdf } from '../utils/api';
+
 
 export default function InterviewScreen() {
   const navigate = useNavigate();
@@ -63,18 +64,28 @@ export default function InterviewScreen() {
   const [isVoiceActive, setIsVoiceActive] = useState(false);
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const [speechEnabled, setSpeechEnabled] = useState(true);
+  const [turnState, setTurnState] = useState('AI_SPEAKING'); // 'AI_SPEAKING' | 'LISTENING' | 'CANDIDATE_SPEAKING' | 'FINALIZING_ANSWER' | 'MANUAL_INPUT'
   
   // Media Stream & DOM Refs
   const videoRef = useRef(null);
   const [cameraStream, setCameraStream] = useState(null);
   const [screenStream, setScreenStream] = useState(null);
 
-  // Speech Recognition Refs (Fixes duplication)
+  // Speech Recognition & Turn-Taking Refs (Zero Duplication & Conversational Turn-Taking)
   const recognitionRef = useRef(null);
   const isDictatingRef = useRef(false);
   const isRecognitionStartingRef = useRef(false);
   const dictationBaseTextRef = useRef("");
   const finalTranscriptRef = useRef("");
+  const silenceTimerRef = useRef(null);
+  const isSubmittingRef = useRef(false);
+  const currentAnswerTextRef = useRef("");
+  const consecutiveNoSpeechRef = useRef(0);
+
+  // Keep currentAnswerTextRef synchronized for silence callback
+  useEffect(() => {
+    currentAnswerTextRef.current = currentAnswerText;
+  }, [currentAnswerText]);
 
   // Timer & Finish States
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -82,6 +93,47 @@ export default function InterviewScreen() {
   const [isFinished, setIsFinished] = useState(false);
   const [terminationInfo, setTerminationInfo] = useState(null);
   const [evaluationResult, setEvaluationResult] = useState(null);
+  const [savedSessionId, setSavedSessionId] = useState(null);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [pdfDownloadError, setPdfDownloadError] = useState(null);
+
+  // Download Server-Generated PDF Evaluation Report
+  const handleDownloadPdf = async () => {
+    try {
+      setIsDownloadingPdf(true);
+      setPdfDownloadError(null);
+      let sid = savedSessionId;
+      if (!sid) {
+        try {
+          const historyKey = `interview_history_${activeEmail}`;
+          const existingHistory = JSON.parse(localStorage.getItem(historyKey) || '[]');
+          if (existingHistory.length > 0 && existingHistory[0]?.id) {
+            sid = existingHistory[0].id;
+          }
+        } catch (e) {}
+      }
+      if (!sid) {
+        const token = localStorage.getItem('token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const resp = await fetch(`${API_URL}/interview/history/${encodeURIComponent(activeEmail)}`, { headers });
+        if (resp.ok) {
+          const d = await resp.json();
+          if (d.data && d.data.length > 0) {
+            sid = d.data[0].id;
+          }
+        }
+      }
+      if (!sid) {
+        throw new Error("No saved session ID found for PDF export.");
+      }
+      await downloadInterviewPdf(sid, activeEmail);
+    } catch (err) {
+      console.error("PDF download error:", err);
+      setPdfDownloadError("Unable to download PDF report. Please verify your connection.");
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
 
   // Format Elapsed Time MM:SS
   const formattedTime = useMemo(() => {
@@ -89,6 +141,7 @@ export default function InterviewScreen() {
     const secs = elapsedSeconds % 60;
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   }, [elapsedSeconds]);
+
 
   // Handle Automatic Termination (3rd warning)
   const handleAutoTermination = useCallback((reason, recordedWarnings) => {
@@ -181,6 +234,7 @@ export default function InterviewScreen() {
     microphoneStatus,
     screenShareStatus,
     faceDetected,
+    headPoseStatus,
     tabVisible,
     interviewTerminated,
     terminationReason,
@@ -195,6 +249,7 @@ export default function InterviewScreen() {
     videoElement: videoRef.current,
     onTerminate: handleAutoTermination
   });
+
 
   // Initialize Media Streams (Camera + Handed-Over Screen Share)
   useEffect(() => {
@@ -279,171 +334,31 @@ export default function InterviewScreen() {
     return () => clearInterval(interval);
   }, [isFinished, interviewTerminated]);
 
-  // Read question with Speech Synthesis
-  const speakCurrentQuestion = useCallback((text) => {
-    if (!speechEnabled || !('speechSynthesis' in window)) return;
-    try {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.95;
-      utterance.pitch = 1.0;
-      utterance.onstart = () => {
-        setIsAiSpeaking(true);
-        setSessionStatus('ASKING');
-      };
-      utterance.onend = () => {
-        setIsAiSpeaking(false);
-        setSessionStatus('ANSWERING');
-      };
-      utterance.onerror = () => {
-        setIsAiSpeaking(false);
-        setSessionStatus('ANSWERING');
-      };
-      window.speechSynthesis.speak(utterance);
-    } catch (e) {
-      setIsAiSpeaking(false);
-      setSessionStatus('ANSWERING');
+  // Stop Voice Recognition Cleanly
+  const stopVoiceRecognition = useCallback(() => {
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
     }
-  }, [speechEnabled]);
-
-  // Trigger question speech on step change
-  useEffect(() => {
-    if (questionsList[currentStep] && !isFinished) {
-      const existingAnswer = userAnswers[currentStep];
-      setCurrentAnswerText(existingAnswer?.transcript || "");
-      dictationBaseTextRef.current = existingAnswer?.transcript || "";
-      finalTranscriptRef.current = "";
-      setQuestionStartTime(Date.now());
-      speakCurrentQuestion(questionsList[currentStep].question);
-    }
-    return () => {
-      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-    };
-  }, [currentStep, isFinished, questionsList, speakCurrentQuestion, userAnswers]);
-
-  // ==================================================
-  // SPEECH RECOGNITION (FIXED: ZERO DUPLICATION)
-  // ==================================================
-  const toggleVoiceRecording = useCallback(() => {
-    // 1. If currently dictating: Stop cleanly
-    if (isDictatingRef.current) {
-      isDictatingRef.current = false;
-      setIsVoiceActive(false);
-      if (recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch (e) {}
-      }
-      return;
-    }
-
-    // 2. Check Browser SpeechRecognition API
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Speech recognition is not supported in this browser. You can type your answers directly into the box.");
-      return;
-    }
-
-    // Stop any existing instance
+    isDictatingRef.current = false;
+    isRecognitionStartingRef.current = false;
+    setIsVoiceActive(false);
     if (recognitionRef.current) {
       try { recognitionRef.current.stop(); } catch (e) {}
     }
-
-    try {
-      // Snapshot current typed answer as the immutable base for this dictation run
-      dictationBaseTextRef.current = currentAnswerText;
-      finalTranscriptRef.current = "";
-
-      const rec = new SpeechRecognition();
-      rec.continuous = true;
-      rec.interimResults = true;
-      rec.lang = 'en-US';
-
-      rec.onstart = () => {
-        isDictatingRef.current = true;
-        setIsVoiceActive(true);
-        isRecognitionStartingRef.current = false;
-      };
-
-      rec.onresult = (event) => {
-        let interimTranscript = "";
-
-        // Iterate through speech results starting at event.resultIndex
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          const result = event.results[i];
-          const transcriptChunk = result[0].transcript;
-
-          if (result.isFinal) {
-            // Commit final chunk once
-            finalTranscriptRef.current += transcriptChunk + " ";
-          } else {
-            // Collect temporary interim chunk
-            interimTranscript += transcriptChunk;
-          }
-        }
-
-        // Combine base + accumulated final + current interim
-        const base = dictationBaseTextRef.current ? dictationBaseTextRef.current.trim() + " " : "";
-        const combined = (base + finalTranscriptRef.current + interimTranscript).trim();
-        setCurrentAnswerText(combined);
-      };
-
-      rec.onerror = (event) => {
-        console.warn("Speech recognition error:", event.error);
-        if (event.error !== 'no-speech') {
-          setIsVoiceActive(false);
-          isDictatingRef.current = false;
-        }
-      };
-
-      rec.onend = () => {
-        // Only restart if candidate is still actively dictating and session is not finished
-        if (isDictatingRef.current && !isRecognitionStartingRef.current && !isFinished) {
-          try {
-            isRecognitionStartingRef.current = true;
-            rec.start();
-          } catch (e) {
-            isRecognitionStartingRef.current = false;
-            setIsVoiceActive(false);
-            isDictatingRef.current = false;
-          }
-        } else {
-          setIsVoiceActive(false);
-          isDictatingRef.current = false;
-        }
-      };
-
-      recognitionRef.current = rec;
-      isRecognitionStartingRef.current = true;
-      rec.start();
-    } catch (e) {
-      console.error("Failed to start speech recognition:", e);
-      setIsVoiceActive(false);
-      isDictatingRef.current = false;
-    }
-  }, [currentAnswerText, isFinished]);
-
-  // Clean up SpeechRecognition on unmount
-  useEffect(() => {
-    return () => {
-      isDictatingRef.current = false;
-      if (recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch (e) {}
-      }
-    };
   }, []);
 
-  // Submit Answer & Move to Next Question
-  const handleSaveAndNext = () => {
-    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-    if (isDictatingRef.current) {
-      isDictatingRef.current = false;
-      setIsVoiceActive(false);
-      if (recognitionRef.current) {
-        try { recognitionRef.current.stop(); } catch (e) {}
-      }
-    }
+  // Submit Answer & Move to Next Question (Forward Declaration / Reference Safe)
+  const handleSaveAndNext = useCallback((overrideText) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
 
-    const trimmed = currentAnswerText.trim();
-    const durationSec = Math.round((Date.now() - questionStartTime) / 1000);
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+    stopVoiceRecognition();
+
+    const rawText = typeof overrideText === 'string' ? overrideText : currentAnswerTextRef.current;
+    const trimmed = (rawText || "").trim();
+    const durationSec = Math.max(1, Math.round((Date.now() - questionStartTime) / 1000));
     const isAnswerProvided = trimmed.length > 5;
 
     const answerRecord = {
@@ -463,12 +378,216 @@ export default function InterviewScreen() {
     updatedAnswers[currentStep] = answerRecord;
     setUserAnswers(updatedAnswers);
 
-    if (currentStep < totalQuestions - 1) {
-      setCurrentStep(prev => prev + 1);
-    } else {
-      finalizeInterviewSession(updatedAnswers);
+    // Reset transcription buffers for next question
+    dictationBaseTextRef.current = "";
+    finalTranscriptRef.current = "";
+    currentAnswerTextRef.current = "";
+    setCurrentAnswerText("");
+
+    setTimeout(() => {
+      isSubmittingRef.current = false;
+      if (currentStep < totalQuestions - 1) {
+        setCurrentStep(prev => prev + 1);
+      } else {
+        finalizeInterviewSession(updatedAnswers);
+      }
+    }, 150);
+  }, [currentStep, totalQuestions, questionStartTime, questionsList, stopVoiceRecognition, userAnswers]);
+
+  // Start Voice Recognition (Conversational Turn-Taking)
+  const startVoiceRecognition = useCallback(() => {
+    if (isDictatingRef.current || isRecognitionStartingRef.current || isFinished) return;
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setTurnState('MANUAL_INPUT');
+      return;
     }
-  };
+
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch (e) {}
+    }
+
+    try {
+      dictationBaseTextRef.current = currentAnswerTextRef.current;
+      finalTranscriptRef.current = "";
+
+      const rec = new SpeechRecognition();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = 'en-US';
+
+      rec.onstart = () => {
+        isDictatingRef.current = true;
+        setIsVoiceActive(true);
+        isRecognitionStartingRef.current = false;
+        setTurnState('LISTENING');
+        consecutiveNoSpeechRef.current = 0;
+      };
+
+      rec.onresult = (event) => {
+        setTurnState('CANDIDATE_SPEAKING');
+        let interimTranscript = "";
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const result = event.results[i];
+          const transcriptChunk = result[0].transcript;
+          if (result.isFinal) {
+            finalTranscriptRef.current += transcriptChunk + " ";
+          } else {
+            interimTranscript += transcriptChunk;
+          }
+        }
+
+        const base = dictationBaseTextRef.current ? dictationBaseTextRef.current.trim() + " " : "";
+        const combined = (base + finalTranscriptRef.current + interimTranscript).trim();
+        setCurrentAnswerText(combined);
+        currentAnswerTextRef.current = combined;
+
+        // Reset silence timer
+        if (silenceTimerRef.current) {
+          clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = null;
+        }
+
+        // Conversational Turn-Taking: If candidate answered meaningfully (>= 5 words), start 3.2s silence detector
+        const wordCount = combined.split(/\s+/).filter(Boolean).length;
+        if (wordCount >= 5 || combined.length >= 20) {
+          silenceTimerRef.current = setTimeout(() => {
+            if (!isSubmittingRef.current && isDictatingRef.current) {
+              setTurnState('FINALIZING_ANSWER');
+              handleSaveAndNext(combined);
+            }
+          }, 3200);
+        }
+      };
+
+      rec.onerror = (event) => {
+        if (event.error === 'no-speech') {
+          consecutiveNoSpeechRef.current += 1;
+          // After repeated no-speech timeouts, stay in listening standby without crashing
+          if (consecutiveNoSpeechRef.current >= 4) {
+            setTurnState('LISTENING');
+          }
+        } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          setIsVoiceActive(false);
+          isDictatingRef.current = false;
+          setTurnState('MANUAL_INPUT');
+        } else {
+          console.warn("Speech recognition notice:", event.error);
+        }
+      };
+
+      rec.onend = () => {
+        if (isDictatingRef.current && !isRecognitionStartingRef.current && !isFinished && !isAiSpeaking) {
+          try {
+            isRecognitionStartingRef.current = true;
+            rec.start();
+          } catch (e) {
+            isRecognitionStartingRef.current = false;
+            setIsVoiceActive(false);
+            isDictatingRef.current = false;
+          }
+        } else {
+          setIsVoiceActive(false);
+          isDictatingRef.current = false;
+        }
+      };
+
+      recognitionRef.current = rec;
+      isRecognitionStartingRef.current = true;
+      rec.start();
+    } catch (e) {
+      console.warn("Speech recognition initialization fallback:", e);
+      setIsVoiceActive(false);
+      isDictatingRef.current = false;
+      setTurnState('MANUAL_INPUT');
+    }
+  }, [handleSaveAndNext, isAiSpeaking, isFinished]);
+
+  // Read Question via Speech Synthesis (TTS -> Auto Listening)
+  const speakCurrentQuestion = useCallback((text) => {
+    if (!speechEnabled || !('speechSynthesis' in window)) {
+      setSessionStatus('ANSWERING');
+      setTurnState('LISTENING');
+      if (speechEnabled && !isFinished) {
+        startVoiceRecognition();
+      }
+      return;
+    }
+
+    try {
+      window.speechSynthesis.cancel();
+      stopVoiceRecognition();
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.95;
+      utterance.pitch = 1.0;
+
+      utterance.onstart = () => {
+        setIsAiSpeaking(true);
+        setSessionStatus('ASKING');
+        setTurnState('AI_SPEAKING');
+      };
+
+      utterance.onend = () => {
+        setIsAiSpeaking(false);
+        setSessionStatus('ANSWERING');
+        setTurnState('LISTENING');
+        if (speechEnabled && !isFinished) {
+          setTimeout(() => {
+            startVoiceRecognition();
+          }, 300);
+        }
+      };
+
+      utterance.onerror = () => {
+        setIsAiSpeaking(false);
+        setSessionStatus('ANSWERING');
+        setTurnState('LISTENING');
+        if (speechEnabled && !isFinished) {
+          startVoiceRecognition();
+        }
+      };
+
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      setIsAiSpeaking(false);
+      setSessionStatus('ANSWERING');
+      setTurnState('LISTENING');
+      if (speechEnabled && !isFinished) {
+        startVoiceRecognition();
+      }
+    }
+  }, [speechEnabled, isFinished, startVoiceRecognition, stopVoiceRecognition]);
+
+  // Trigger question speech on step change
+  useEffect(() => {
+    if (questionsList[currentStep] && !isFinished) {
+      const existingAnswer = userAnswers[currentStep];
+      const initialText = existingAnswer?.transcript || "";
+      setCurrentAnswerText(initialText);
+      currentAnswerTextRef.current = initialText;
+      dictationBaseTextRef.current = initialText;
+      finalTranscriptRef.current = "";
+      setQuestionStartTime(Date.now());
+      speakCurrentQuestion(questionsList[currentStep].question);
+    }
+    return () => {
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      stopVoiceRecognition();
+    };
+  }, [currentStep, isFinished, questionsList, speakCurrentQuestion, stopVoiceRecognition, userAnswers]);
+
+  // Manual Toggle Voice Dictation Button
+  const toggleVoiceRecording = useCallback(() => {
+    if (isDictatingRef.current) {
+      stopVoiceRecognition();
+      setTurnState('MANUAL_INPUT');
+    } else {
+      startVoiceRecognition();
+    }
+  }, [startVoiceRecognition, stopVoiceRecognition]);
 
   // Skip Question Handler
   const handleSkipQuestion = () => {
@@ -562,11 +681,13 @@ export default function InterviewScreen() {
 
     // ONLY SAVE AND LOG TO LOCALSTORAGE IF AT LEAST 1 REAL ANSWER WAS PROVIDED
     if (evaluation.isValid && evaluation.answeredCount > 0) {
+      const sessionEntryId = backendSession?.id || `sess-${Date.now()}`;
+      setSavedSessionId(backendSession?.id || sessionEntryId);
       try {
         const historyKey = `interview_history_${activeEmail}`;
         const existingHistory = JSON.parse(localStorage.getItem(historyKey) || '[]');
         const newEntry = backendSession || {
-          id: `sess-${Date.now()}`,
+          id: sessionEntryId,
           roleName: interviewConfig.roleName || targetRole,
           difficulty: interviewConfig.difficulty || "Intermediate",
           score: evaluation.overallScore,
@@ -580,6 +701,7 @@ export default function InterviewScreen() {
         const updatedHistory = [newEntry, ...existingHistory];
         localStorage.setItem(historyKey, JSON.stringify(updatedHistory));
       } catch (e) {}
+
 
       // Log to Backend Analytics API
       try {
@@ -811,6 +933,132 @@ export default function InterviewScreen() {
           </div>
         </div>
 
+        {/* Speech Quality & Verbal Delivery Analysis */}
+        {evaluationResult.speech_metrics && (
+          <div className="bg-white dark:bg-[#111215] rounded-3xl p-6 sm:p-8 border border-gray-200 dark:border-white/[0.08] shadow-xs space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 dark:border-gray-800/80 pb-4">
+              <h2 className="text-xs font-extrabold text-gray-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                <Mic className="w-4 h-4 text-primary" />
+                <span>Speech Quality & Verbal Delivery Analysis</span>
+              </h2>
+              <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                Objective Acoustic & Transcription Metrics
+              </span>
+            </div>
+
+            {/* Top Metric Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Total Fillers */}
+              <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800 space-y-1">
+                <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-wider block">
+                  Total Filler Words
+                </span>
+                <div className="flex items-baseline gap-2">
+                  <span className={`text-2xl font-extrabold ${evaluationResult.speech_metrics.total_filler_count === 0 ? 'text-emerald-600' : 'text-gray-900 dark:text-white'}`}>
+                    {evaluationResult.speech_metrics.total_filler_count}
+                  </span>
+                  {evaluationResult.speech_metrics.filler_rate !== null && (
+                    <span className="text-[10px] font-bold text-gray-400">
+                      ({evaluationResult.speech_metrics.filler_rate} per 100 words)
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] text-gray-500 block">
+                  {evaluationResult.speech_metrics.total_filler_count === 0 ? "Clean verbal delivery" : "Hesitation markers detected"}
+                </span>
+              </div>
+
+              {/* Speaking Pace / WPM */}
+              <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800 space-y-1">
+                <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-wider block">
+                  Speaking Rate (WPM)
+                </span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-extrabold text-gray-900 dark:text-white">
+                    {evaluationResult.speech_metrics.words_per_minute !== null ? `${evaluationResult.speech_metrics.words_per_minute}` : 'N/A'}
+                  </span>
+                  {evaluationResult.speech_metrics.words_per_minute !== null && (
+                    <span className="text-[10px] font-bold text-gray-400">WPM</span>
+                  )}
+                </div>
+                <span className="text-[10px] text-gray-500 block">
+                  {evaluationResult.speech_metrics.words_per_minute !== null
+                    ? (evaluationResult.speech_metrics.words_per_minute >= 115 && evaluationResult.speech_metrics.words_per_minute <= 155
+                        ? "Optimal conversational pace"
+                        : evaluationResult.speech_metrics.words_per_minute > 155
+                        ? "Fast delivery pace"
+                        : "Deliberate / slow pace")
+                    : "Duration not captured"}
+                </span>
+              </div>
+
+              {/* Fluency / Communication Benchmark */}
+              <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800 space-y-1">
+                <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-wider block">
+                  Fluency Benchmark
+                </span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-extrabold text-primary">
+                    {evaluationResult.dimensions?.communication || 80}%
+                  </span>
+                  <span className="text-[10px] font-bold text-gray-400">Score</span>
+                </div>
+                <span className="text-[10px] text-gray-500 block">
+                  Derived from speech continuity & clarity
+                </span>
+              </div>
+            </div>
+
+            {/* Filler Breakdown Detail */}
+            <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-900/60 border border-gray-100 dark:border-gray-800 space-y-2.5">
+              <span className="text-[10px] font-extrabold text-gray-500 dark:text-gray-400 uppercase tracking-wider block">
+                Filler-Word Breakdown
+              </span>
+
+              {evaluationResult.speech_metrics.total_filler_count === 0 ? (
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 text-emerald-800 dark:text-emerald-300 text-xs font-semibold">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>No filler words detected throughout your interview responses.</span>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {Object.entries(evaluationResult.speech_metrics.filler_breakdown || {}).map(([word, count]) => (
+                    <div
+                      key={word}
+                      className="px-3 py-1.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center gap-2 shadow-xs text-xs"
+                    >
+                      <span className="font-semibold text-gray-800 dark:text-gray-200 font-mono">"{word}"</span>
+                      <span className="px-1.5 py-0.5 rounded-md bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-400 text-[10px] font-extrabold">
+                        {count} {count === 1 ? 'time' : 'times'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Actionable Speech Observations */}
+            {evaluationResult.speech_metrics.speech_observations?.length > 0 && (
+              <div className="space-y-2 pt-1">
+                <span className="text-[10px] font-extrabold text-gray-500 dark:text-gray-400 uppercase tracking-wider block">
+                  Actionable Speech Observations
+                </span>
+                <div className="space-y-1.5 text-xs">
+                  {evaluationResult.speech_metrics.speech_observations.map((obs, obsIdx) => (
+                    <div
+                      key={obsIdx}
+                      className="p-3 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 text-blue-900 dark:text-blue-200 flex items-start gap-2 leading-relaxed"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                      <span>{obs}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Question-Wise Detailed Analysis */}
         <div className="bg-white dark:bg-[#111215] rounded-3xl p-6 sm:p-8 border border-gray-200 dark:border-white/[0.08] shadow-xs space-y-4">
           <h2 className="text-xs font-extrabold text-gray-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
@@ -840,9 +1088,24 @@ export default function InterviewScreen() {
                 </div>
 
                 {qEval.wordCount > 0 && (
-                  <div className="flex gap-3 text-[10px] font-bold text-gray-400">
+                  <div className="flex flex-wrap gap-3 text-[10px] font-bold text-gray-400 pt-1 border-t border-gray-100 dark:border-gray-800">
                     <span>Word Count: {qEval.wordCount} words</span>
                     <span>STAR Alignment: {qEval.hasSTARStructure ? "✓ Detected" : "General Structure"}</span>
+                    {qEval.speech_analysis && (
+                      <>
+                        <span>
+                          Fillers: {qEval.speech_analysis.filler_count}
+                          {qEval.speech_analysis.filler_count > 0 && qEval.speech_analysis.filler_breakdown && Object.keys(qEval.speech_analysis.filler_breakdown).length > 0 && (
+                            <span className="ml-1 font-mono text-orange-600 dark:text-orange-400">
+                              ({Object.entries(qEval.speech_analysis.filler_breakdown).map(([w, c]) => `${w}: ${c}`).join(', ')})
+                            </span>
+                          )}
+                        </span>
+                        {qEval.speech_analysis.wpm !== null && qEval.speech_analysis.wpm > 0 && (
+                          <span>Speaking Pace: {qEval.speech_analysis.wpm} WPM</span>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -890,8 +1153,16 @@ export default function InterviewScreen() {
           </div>
         </div>
 
+        {/* PDF Download Error Alert */}
+        {pdfDownloadError && (
+          <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40 text-xs text-rose-700 dark:text-rose-400 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            <span>{pdfDownloadError}</span>
+          </div>
+        )}
+
         {/* Action Controls */}
-        <div className="flex items-center justify-between pt-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
           <button
             onClick={() => navigate('/role-interviews')}
             className="px-5 py-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-xs font-bold hover:bg-gray-200 cursor-pointer"
@@ -899,7 +1170,16 @@ export default function InterviewScreen() {
             Back to Studio
           </button>
           
-          <div className="flex gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={handleDownloadPdf}
+              disabled={isDownloadingPdf}
+              className="px-5 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 text-xs font-bold hover:bg-gray-100 dark:hover:bg-gray-750 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-all shadow-xs"
+            >
+              <Download className="w-3.5 h-3.5 text-primary" />
+              <span>{isDownloadingPdf ? "Generating PDF..." : "Download PDF Report"}</span>
+            </button>
+
             <button
               onClick={() => {
                 setIsFinished(false);
@@ -907,6 +1187,8 @@ export default function InterviewScreen() {
                 setUserAnswers(Array(totalQuestions).fill(null));
                 setCurrentAnswerText("");
                 setElapsedSeconds(0);
+                setSavedSessionId(null);
+                setPdfDownloadError(null);
               }}
               className="px-5 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 text-xs font-bold hover:bg-gray-100 flex items-center gap-1.5 cursor-pointer"
             >
@@ -922,6 +1204,7 @@ export default function InterviewScreen() {
             </button>
           </div>
         </div>
+
 
       </div>
     );
@@ -1086,11 +1369,37 @@ export default function InterviewScreen() {
 
         {/* RIGHT COLUMN: Candidate Answer Workspace */}
         <div className="lg:col-span-7 bg-white dark:bg-[#111215] rounded-3xl p-6 sm:p-7 border border-gray-200 dark:border-white/[0.08] shadow-xs space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-extrabold text-gray-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
-              <User className="w-4 h-4 text-primary" />
-              <span>Your Live Response</span>
-            </h3>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <h3 className="text-xs font-extrabold text-gray-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                <User className="w-4 h-4 text-primary" />
+                <span>Your Live Response</span>
+              </h3>
+
+              {/* Turn State Indicator Pill */}
+              <div className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 transition-all ${
+                turnState === 'AI_SPEAKING'
+                  ? 'bg-orange-50 dark:bg-orange-950/40 text-primary border border-orange-200 dark:border-orange-900/30'
+                  : turnState === 'CANDIDATE_SPEAKING'
+                  ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/30'
+                  : turnState === 'FINALIZING_ANSWER'
+                  ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900/30'
+                  : turnState === 'LISTENING'
+                  ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900/30'
+                  : 'bg-gray-50 dark:bg-gray-800 text-gray-500 border border-gray-200 dark:border-gray-700'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  turnState === 'AI_SPEAKING' || turnState === 'CANDIDATE_SPEAKING' ? 'bg-current animate-ping' : 'bg-current'
+                }`} />
+                <span>
+                  {turnState === 'AI_SPEAKING' && 'AI Asking...'}
+                  {turnState === 'LISTENING' && 'Listening (Speak Now)'}
+                  {turnState === 'CANDIDATE_SPEAKING' && 'Recording Answer...'}
+                  {turnState === 'FINALIZING_ANSWER' && 'Finalizing...'}
+                  {turnState === 'MANUAL_INPUT' && 'Manual Typing'}
+                </span>
+              </div>
+            </div>
 
             <button
               onClick={toggleVoiceRecording}
@@ -1101,7 +1410,7 @@ export default function InterviewScreen() {
               }`}
             >
               {isVoiceActive ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5 text-primary" />}
-              <span>{isVoiceActive ? "Stop Dictation" : "Dictate via Voice"}</span>
+              <span>{isVoiceActive ? "Mute Mic" : "Voice Active"}</span>
             </button>
           </div>
 

@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 /**
- * Dedicated AI Mock Interview Proctoring Hook
- * Centralizes tab visibility, camera, microphone, screen sharing, and face presence monitoring
- * with event locking, grace periods, anti-cheating rules, and 3-warning auto-termination.
+ * PREPRIA AI Mock Interview Proctoring Hook — Phase 16 Hardened
+ * Centralizes tab visibility, window focus, hardware streams (camera/mic),
+ * screen sharing, face presence, head position, and looking-away / head orientation monitoring
+ * with event locking, temporal persistence (grace periods), and 3-warning auto-termination.
  */
 export function useInterviewProctoring({
   enabled = true,
@@ -22,6 +23,7 @@ export function useInterviewProctoring({
   const [microphoneStatus, setMicrophoneStatus] = useState("active");
   const [screenShareStatus, setScreenShareStatus] = useState(requireScreen ? "active" : "not_required");
   const [faceDetected, setFaceDetected] = useState(true);
+  const [headPoseStatus, setHeadPoseStatus] = useState("centered"); // "centered" | "turned_left" | "turned_right" | "turned_up" | "turned_down" | "out_of_frame" | "missing"
   const [tabVisible, setTabVisible] = useState(true);
   const [interviewTerminated, setInterviewTerminated] = useState(false);
   const [terminationReason, setTerminationReason] = useState("");
@@ -36,15 +38,19 @@ export function useInterviewProctoring({
   const cameraViolationActiveRef = useRef(false);
   const micViolationActiveRef = useRef(false);
   const screenViolationActiveRef = useRef(false);
-  const faceViolationActiveRef = useRef(false);
-  const faceMissingTimerRef = useRef(null);
+  const faceMissingViolationActiveRef = useRef(false);
+  const headPoseViolationActiveRef = useRef(false);
 
-  // Canvas for lightweight client-side face presence detection
-  const canvasRef = useRef(null);
-  const monitorIntervalRef = useRef(null);
+  // Timers for temporal persistence (grace periods)
+  const faceMissingTimerRef = useRef(null);
+  const headPoseTimerRef = useRef(null);
   const warningDismissTimeoutRef = useRef(null);
 
-  // Central Warning Function: Single entry point for all proctoring violations
+  // Canvas for lightweight client-side spatial and orientation processing (160x120)
+  const canvasRef = useRef(null);
+  const monitorIntervalRef = useRef(null);
+
+  // Central Warning Function: Single authoritative entry point for all proctoring violations
   const addProctoringWarning = useCallback((reason, type = "GENERAL") => {
     if (isTerminatedRef.current || !enabled) return;
 
@@ -53,7 +59,7 @@ export function useInterviewProctoring({
     setWarningCount(newCount);
 
     const violationRecord = {
-      id: `warn-${Date.now()}`,
+      id: `warn-${Date.now()}-${newCount}`,
       count: newCount,
       maxWarnings: 3,
       type,
@@ -64,7 +70,7 @@ export function useInterviewProctoring({
     warningsListRef.current.push(violationRecord);
     setWarnings([...warningsListRef.current]);
 
-    // Display visible banner to candidate
+    // Display visible neutral banner to candidate
     setActiveWarning(`⚠ Proctoring Warning ${newCount}/3: ${reason}`);
     if (warningDismissTimeoutRef.current) clearTimeout(warningDismissTimeoutRef.current);
     warningDismissTimeoutRef.current = setTimeout(() => {
@@ -75,12 +81,13 @@ export function useInterviewProctoring({
     if (newCount >= 3) {
       isTerminatedRef.current = true;
       setInterviewTerminated(true);
-      const termReason = "Interview automatically terminated after 3 proctoring violations.";
+      const termReason = "Interview automatically terminated after 3 proctoring warnings.";
       setTerminationReason(termReason);
 
-      // Stop all background intervals
+      // Stop all background intervals & timers
       if (monitorIntervalRef.current) clearInterval(monitorIntervalRef.current);
       if (faceMissingTimerRef.current) clearTimeout(faceMissingTimerRef.current);
+      if (headPoseTimerRef.current) clearTimeout(headPoseTimerRef.current);
 
       // Trigger automatic submission callback
       if (typeof onTerminate === 'function') {
@@ -108,7 +115,6 @@ export function useInterviewProctoring({
     };
 
     const handleWindowBlur = () => {
-      // Handled primarily via document.visibilitychange to prevent double-counting
       if (document.hidden && !tabViolationActiveRef.current) {
         tabViolationActiveRef.current = true;
         addProctoringWarning("Interview window lost focus. Please remain in full view.", "WINDOW_BLUR");
@@ -213,7 +219,7 @@ export function useInterviewProctoring({
     }
   }, [enabled, requireScreen, screenStream, addProctoringWarning]);
 
-  // 4. Face Presence Monitoring with 5-Second Grace Period
+  // 4. Face Presence, Spatial Centroid & Head Orientation Monitoring (Phase 16)
   useEffect(() => {
     if (!enabled || isTerminatedRef.current || !requireVideo) return;
 
@@ -223,7 +229,7 @@ export function useInterviewProctoring({
       canvasRef.current.height = 120;
     }
 
-    const checkFacePresence = () => {
+    const checkFaceAndHeadPose = () => {
       if (isTerminatedRef.current || !videoElement) return;
       if (videoElement.videoWidth === 0 || videoElement.videoHeight === 0) return;
 
@@ -234,56 +240,146 @@ export function useInterviewProctoring({
       try {
         const frame = ctx.getImageData(0, 0, 160, 120);
         const data = frame.data;
+        const width = 160;
+        const height = 120;
+        const totalPixels = width * height;
+
         let brightnessSum = 0;
         let skinTonePixels = 0;
+        let sumX = 0;
+        let sumY = 0;
+        let leftSideSkin = 0;
+        let rightSideSkin = 0;
 
         for (let i = 0; i < data.length; i += 4) {
+          const pixelIndex = i / 4;
+          const x = pixelIndex % width;
+          const y = Math.floor(pixelIndex / width);
+
           const r = data[i];
           const g = data[i + 1];
           const b = data[i + 2];
           brightnessSum += (r + g + b) / 3;
 
-          // Skin tone presence heuristic
+          // Robust skin tone detection heuristic
           if (r > 60 && g > 40 && b > 20 && r > g && r > b && (Math.max(r, g, b) - Math.min(r, g, b) > 15)) {
             skinTonePixels++;
+            sumX += x;
+            sumY += y;
+            if (x < width / 2) {
+              leftSideSkin++;
+            } else {
+              rightSideSkin++;
+            }
           }
         }
 
-        const totalPixels = data.length / 4;
         const avgBrightness = brightnessSum / totalPixels;
         const skinRatio = skinTonePixels / totalPixels;
+        const isFacePresent = avgBrightness > 18 && skinRatio > 0.035;
 
-        const isFacePresent = avgBrightness > 20 && skinRatio > 0.04;
-
-        if (isFacePresent) {
-          setFaceDetected(true);
-          // Face is back: cancel any pending grace-period timer and reset violation lock
-          if (faceMissingTimerRef.current) {
-            clearTimeout(faceMissingTimerRef.current);
-            faceMissingTimerRef.current = null;
-          }
-          faceViolationActiveRef.current = false;
-        } else {
+        // A. Face Missing Detection
+        if (!isFacePresent) {
           setFaceDetected(false);
-          // Face missing: Start 5-second grace period timer if not already running
-          if (!faceMissingTimerRef.current && !faceViolationActiveRef.current) {
-            faceMissingTimerRef.current = setTimeout(() => {
-              faceViolationActiveRef.current = true;
-              addProctoringWarning("Your face is not visible. Please remain clearly visible to the camera.", "FACE_NOT_DETECTED");
-              faceMissingTimerRef.current = null;
-            }, 5000); // 5-second grace period
+          setHeadPoseStatus("missing");
+
+          // Clear any head pose timer since face is missing entirely
+          if (headPoseTimerRef.current) {
+            clearTimeout(headPoseTimerRef.current);
+            headPoseTimerRef.current = null;
           }
+
+          // Start 5-second grace period for missing face
+          if (!faceMissingTimerRef.current && !faceMissingViolationActiveRef.current) {
+            faceMissingTimerRef.current = setTimeout(() => {
+              faceMissingViolationActiveRef.current = true;
+              addProctoringWarning("Please keep your face visible to the camera.", "FACE_NOT_DETECTED");
+              faceMissingTimerRef.current = null;
+            }, 5000);
+          }
+          return;
         }
+
+        // Face is present -> clear face missing state
+        setFaceDetected(true);
+        if (faceMissingTimerRef.current) {
+          clearTimeout(faceMissingTimerRef.current);
+          faceMissingTimerRef.current = null;
+        }
+        faceMissingViolationActiveRef.current = false;
+
+        // B. Spatial Centroid & Head Orientation Analysis
+        const centroidX = sumX / skinTonePixels / width;   // [0, 1]
+        const centroidY = sumY / skinTonePixels / height;  // [0, 1]
+
+        let currentDeviationType = null;
+        let currentDeviationMessage = null;
+        let detectedPose = "centered";
+
+        // 1. Head out of frame (Severe boundary offset)
+        if (centroidX < 0.20 || centroidX > 0.80 || centroidY < 0.14 || centroidY > 0.86) {
+          detectedPose = "out_of_frame";
+          currentDeviationType = "HEAD_OUT_OF_FRAME";
+          currentDeviationMessage = "Please keep your head centered within the camera frame.";
+        }
+        // 2. Head turned left (looking away to left)
+        else if (centroidX < 0.30 || (leftSideSkin / Math.max(1, rightSideSkin) > 2.8 && centroidX < 0.42)) {
+          detectedPose = "turned_left";
+          currentDeviationType = "HEAD_TURNED_LEFT";
+          currentDeviationMessage = "Please face the camera directly.";
+        }
+        // 3. Head turned right (looking away to right)
+        else if (centroidX > 0.70 || (rightSideSkin / Math.max(1, leftSideSkin) > 2.8 && centroidX > 0.58)) {
+          detectedPose = "turned_right";
+          currentDeviationType = "HEAD_TURNED_RIGHT";
+          currentDeviationMessage = "Please face the camera directly.";
+        }
+        // 4. Head tilted up (looking away up)
+        else if (centroidY < 0.22) {
+          detectedPose = "turned_up";
+          currentDeviationType = "HEAD_TURNED_UP";
+          currentDeviationMessage = "Please face the camera directly.";
+        }
+        // 5. Head tilted down (looking away down)
+        else if (centroidY > 0.78) {
+          detectedPose = "turned_down";
+          currentDeviationType = "HEAD_TURNED_DOWN";
+          currentDeviationMessage = "Please face the camera directly.";
+        }
+
+        setHeadPoseStatus(detectedPose);
+
+        // C. Temporal Persistence & Debounce for Head Pose Deviations (4.5-second grace period)
+        if (currentDeviationType) {
+          // Sustained deviation: start timer if not already running and not locked
+          if (!headPoseTimerRef.current && !headPoseViolationActiveRef.current) {
+            headPoseTimerRef.current = setTimeout(() => {
+              headPoseViolationActiveRef.current = true;
+              addProctoringWarning(currentDeviationMessage, currentDeviationType);
+              headPoseTimerRef.current = null;
+            }, 4500); // 4.5-second grace period ensures transient natural movement is ignored
+          }
+        } else {
+          // Candidate is centered and facing forward: clear pending deviation timer and reset lock
+          if (headPoseTimerRef.current) {
+            clearTimeout(headPoseTimerRef.current);
+            headPoseTimerRef.current = null;
+          }
+          headPoseViolationActiveRef.current = false;
+        }
+
       } catch (e) {
         setFaceDetected(true);
+        setHeadPoseStatus("centered");
       }
     };
 
-    monitorIntervalRef.current = setInterval(checkFacePresence, 1500);
+    monitorIntervalRef.current = setInterval(checkFaceAndHeadPose, 1200);
 
     return () => {
       if (monitorIntervalRef.current) clearInterval(monitorIntervalRef.current);
       if (faceMissingTimerRef.current) clearTimeout(faceMissingTimerRef.current);
+      if (headPoseTimerRef.current) clearTimeout(headPoseTimerRef.current);
     };
   }, [enabled, requireVideo, videoElement, addProctoringWarning]);
 
@@ -292,6 +388,7 @@ export function useInterviewProctoring({
     return () => {
       if (monitorIntervalRef.current) clearInterval(monitorIntervalRef.current);
       if (faceMissingTimerRef.current) clearTimeout(faceMissingTimerRef.current);
+      if (headPoseTimerRef.current) clearTimeout(headPoseTimerRef.current);
       if (warningDismissTimeoutRef.current) clearTimeout(warningDismissTimeoutRef.current);
     };
   }, []);
@@ -305,9 +402,11 @@ export function useInterviewProctoring({
     microphoneStatus,
     screenShareStatus,
     faceDetected,
+    headPoseStatus,
     tabVisible,
     interviewTerminated,
     terminationReason,
     addProctoringWarning
   };
 }
+

@@ -127,10 +127,6 @@ export default function MockInterview() {
     }
   };
 
-      return "Could you tell me more about your recent problem-solving experience?";
-    }
-  };
-
   const endInterview = async (terminated = false, additionalNote = "") => {
     setInterviewState('summary');
     
@@ -160,13 +156,13 @@ export default function MockInterview() {
     logActivity({
       type: "interview_complete",
       title: terminated ? "Interview Terminated" : "Interview Completed",
-      score: score,
+      score: overallScore,
       timestamp: Date.now()
     });
 
     logNotification({
       title: terminated ? "Interview Terminated" : "Interview Evaluated",
-      message: terminated ? `Session closed due to policy violation: ${additionalNote}` : `Final Score: ${score}/100`
+      message: terminated ? `Session closed due to policy violation: ${additionalNote}` : `Final Score: ${overallScore}/100`
     });
 
     // We do NOT stop tracks here, we stop them only on component unmount

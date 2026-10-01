@@ -1,0 +1,58 @@
+{
+  "reshmad362@gmail.com": {
+    "target_role": "Full stack Developer",
+    "career_domain": "Technology",
+    "readiness_score": 0,
+    "milestones": {
+      "ms-full-stack-developer-01": {
+        "status": "in_progress",
+        "evidence": [],
+        "completedAt": null
+      },
+      "ms-full-stack-developer-02": {
+        "status": "locked",
+        "evidence": [],
+        "completedAt": null
+      },
+      "ms-full-stack-developer-03": {
+        "status": "locked",
+        "evidence": [],
+        "completedAt": null
+      },
+      "ms-full-stack-developer-04": {
+        "status": "locked",
+        "evidence": [],
+        "completedAt": null
+      }
+    },
+    "updated_at": "2026-09-30T17:34:50.863575+00:00"
+  },
+  "e2e_candidate_a@prepria.test": {
+    "target_role": "Full Stack Developer",
+    "career_domain": "Technology",
+    "readiness_score": 0,
+    "milestones": {
+      "ms-full-stack-developer-01": {
+        "status": "in_progress",
+        "evidence": [],
+        "completedAt": null
+      },
+      "ms-full-stack-developer-02": {
+        "status": "locked",
+        "evidence": [],
+        "completedAt": null
+      },
+      "ms-full-stack-developer-03": {
+        "status": "locked",
+        "evidence": [],
+        "completedAt": null
+      },
+      "ms-full-stack-developer-04": {
+        "status": "locked",
+        "evidence": [],
+        "completedAt": null
+      }
+    },
+    "updated_at": "2026-09-30T17:49:39.386406+00:00"
+  }
+}

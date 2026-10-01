@@ -27,9 +27,10 @@ def analyze_speech(text: str, duration_seconds: int) -> dict:
     pause_data = detect_pauses(duration_seconds, text_clean)
     
     # Calculate fluency score
-    filler_count = filler_data["filler_count"]
-    pause_count = pause_data["pause_count"]
-    long_pauses = pause_data["long_pauses"]
+    filler_count = filler_data.get("filler_count", 0)
+    filler_breakdown = filler_data.get("filler_breakdown", {})
+    pause_count = pause_data.get("pause_count", 0)
+    long_pauses = pause_data.get("long_pauses", 0)
     
     fluency_score = max(
         0,
@@ -37,17 +38,19 @@ def analyze_speech(text: str, duration_seconds: int) -> dict:
     )
     
     words = len(text_clean.split()) if text_clean else 0
-    wpm = round((words / (duration_seconds / 60.0)), 1) if duration_seconds > 0 else 0
+    wpm = round((words / (duration_seconds / 60.0)), 1) if (duration_seconds > 0 and words > 0) else 0
         
     return {
         "filler_count": filler_count,
-        "fillers": filler_data["fillers"],
+        "fillers": filler_data.get("fillers", []),
+        "filler_breakdown": filler_breakdown,
         "pause_count": pause_count,
         "long_pauses": long_pauses,
-        "max_pause_duration": pause_data["max_pause_duration"],
+        "max_pause_duration": pause_data.get("max_pause_duration", 0.0),
         "fluency_score": int(fluency_score),
         "wpm": wpm,
         "words": words,
         "duration_seconds": duration_seconds
     }
+
 

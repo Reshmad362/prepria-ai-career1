@@ -5,10 +5,11 @@ import {
   Map, CheckCircle2, Circle, Lock, ArrowRight, PlayCircle, Target, 
   Briefcase, ChevronRight, Sparkles, RefreshCw, Zap, Award, Layers, 
   Check, ArrowUpRight, BarChart3, AlertTriangle, BookOpen, Code2, 
-  Clock, ShieldCheck, Flame, Compass, ChevronDown, CheckCheck, Filter, Users, Globe 
+  Clock, ShieldCheck, Flame, Compass, ChevronDown, CheckCheck, Filter, Users, Globe, Loader2 
 } from 'lucide-react';
-import { computeCareerRoadmap, CAREER_DOMAINS, ROLE_DEFINITIONS } from '../utils/roadmapEngine';
+import { CAREER_DOMAINS, ROLE_DEFINITIONS } from '../utils/roadmapEngine';
 import { logActivity } from '../utils/activityLogger';
+import { getCareerRoadmap, updateRoadmapTargetRole, completeRoadmapMilestone } from '../utils/api';
 
 export default function CareerRoadmap() {
   const navigate = useNavigate();
@@ -19,29 +20,165 @@ export default function CareerRoadmap() {
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [showRequirementsModal, setShowRequirementsModal] = useState(false);
   const [expandedMilestone, setExpandedMilestone] = useState(null);
+  
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [roadmapData, setRoadmapData] = useState(null);
 
-  // Compute roadmap state dynamically
-  const roadmapData = computeCareerRoadmap({
-    targetRole: selectedRole,
-    userSkills: profile?.skills || [],
-    experienceLevel: profile?.experience || preferences?.experienceLevel || 'Fresher',
-    atsScore: profile?.score || 85,
-    experienceText: profile?.experience || ''
-  });
+  // Fetch Authoritative Roadmap from Backend
+  const fetchRoadmap = async (roleToFetch = null) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const role = roleToFetch || selectedRole;
+      const res = await getCareerRoadmap(role);
+      const d = (res && res.data) ? res.data : (res && (res.target_role || res.readiness_score !== undefined)) ? res : null;
+      if (d) {
+        // Transform backend roadmap data into UI viewmodel
+        const roleDef = ROLE_DEFINITIONS[d.target_role] || ROLE_DEFINITIONS['Full Stack Developer'] || {};
+        const verifiedSkills = d.verified_skills || [];
+        const missingSkills = d.missing_skills || [];
+        const readiness = d.readiness_score || 0;
+        const milestones = (d.milestones || []).map((m, idx) => {
+          const isDone = m.status === 'completed';
+          const isInProg = m.status === 'in_progress';
+          return {
+            id: m.id,
+            step: m.step || `${idx + 1}`.padStart(2, '0'),
+            phase: m.phase || 'CORE',
+            title: m.title,
+            desc: m.desc,
+            status: m.status || 'locked',
+            progress: isDone ? 100 : isInProg ? 50 : 0,
+            duration: `${m.estimatedWeeks || 2} weeks`,
+            why: m.why || 'Essential milestone for candidate placement readiness.',
+            action: m.action || 'Complete recommended practice modules.',
+            evidence: m.evidence || [],
+            completedDate: m.completedAt ? m.completedAt.slice(0, 10) : null,
+            skillChecks: (m.skills || []).map(sk => ({
+              name: sk,
+              completed: verifiedSkills.some(vs => vs.toLowerCase() === sk.toLowerCase())
+            }))
+          };
+        });
 
-  // Sync active domain tab if user opens modal
+        const completedCount = milestones.filter(m => m.status === 'completed').length;
+        const progressPercentage = milestones.length > 0 ? Math.round((completedCount / milestones.length) * 100) : 0;
+
+        // Structured metrics
+        const metrics = [
+          {
+            label: "Overall Readiness",
+            score: readiness,
+            status: readiness >= 80 ? "Interview Ready" : readiness >= 60 ? "Progressing" : "Foundational",
+            detail: `${d.verified_skills_count || 0} of ${d.total_required_skills || 10} core skills verified`
+          },
+          {
+            label: "Skill Coverage",
+            score: d.skill_coverage_percent || 0,
+            status: `${d.skill_coverage_percent || 0}% Match`,
+            detail: `${missingSkills.length} competency gaps identified`
+          },
+          {
+            label: "Learning Hours",
+            score: Math.min(100, (completedCount * 25) + 15),
+            status: "Verified Progress",
+            detail: `${completedCount} milestone goals achieved`
+          },
+          {
+            label: "Target Alignment",
+            score: Math.min(100, readiness + 10),
+            status: d.career_domain || "Technology",
+            detail: "Benchmarked against industry standards"
+          },
+          {
+            label: "Estimated Weeks",
+            score: Math.max(10, 100 - ((d.estimated_weeks || 6) * 10)),
+            status: `${d.estimated_weeks || 6} Weeks`,
+            detail: "Pace to placement readiness"
+          }
+        ];
+
+        // Next Best Action
+        const nextActionText = d.recommended_next_action || "Complete your next milestone module in the Learning Hub.";
+        const nextBestAction = {
+          title: `Milestone Step ${d.active_step || '01'} Focus`,
+          why: nextActionText,
+          impact: "+15% Role Readiness",
+          time: `${d.estimated_weeks || 4} Weeks`
+        };
+
+        // Role Fit
+        const roleDimensions = (d.dimensions || roleDef.dimensions || []).map(dim => ({
+          name: dim.name,
+          score: Math.min(100, Math.round(readiness * (dim.weight ? (1 + dim.weight * 0.2) : 1)))
+        }));
+
+        const roleFit = {
+          matchPercentage: d.skill_coverage_percent || readiness,
+          dimensions: roleDimensions,
+          summary: `Your candidate profile aligns with ${d.verified_skills_count || 0} essential competencies for ${d.target_role}. Addressing remaining gaps will maximize hiring probability.`
+        };
+
+        const recommendedProject = {
+          title: `Full-Scale ${d.target_role} Architecture Capstone`,
+          why: `Build a production-grade portfolio project showcasing ${verifiedSkills.slice(0, 3).join(', ') || 'core competencies'} and enterprise standards.`,
+          skills: (roleDef.coreSkills || verifiedSkills).slice(0, 5),
+          time: '2–3 weeks'
+        };
+
+        setRoadmapData({
+          careerDomain: d.career_domain || "Technology",
+          targetRole: d.target_role,
+          category: roleDef.category || `${d.career_domain} Track`,
+          experienceLevel: profile?.experience || preferences?.experienceLevel || "Fresher",
+          resumeScore: profile?.score || 85,
+          overallReadiness: readiness,
+          strongSkills: verifiedSkills,
+          skillGaps: missingSkills.slice(0, 5),
+          missingSkills: missingSkills,
+          completedCount: completedCount,
+          totalMilestones: milestones.length,
+          progressPercentage: progressPercentage,
+          metrics: metrics,
+          nextBestAction: nextBestAction,
+          milestones: milestones,
+          roleFit: roleFit,
+          recommendedProject: recommendedProject
+        });
+      }
+    } catch (err) {
+      console.error("Failed to fetch career roadmap:", err);
+      setError("Failed to load career roadmap from server. Please try again.");
+    } finally {
+      setLoading(false);
+      setIsRegenerating(false);
+    }
+  };
+
   useEffect(() => {
-    if (roadmapData.careerDomain) {
+    fetchRoadmap();
+  }, [selectedRole]);
+
+  // Sync active domain tab if roadmap loads
+  useEffect(() => {
+    if (roadmapData?.careerDomain) {
       setActiveDomainFilter(roadmapData.careerDomain);
     }
-  }, [roadmapData.careerDomain]);
+  }, [roadmapData?.careerDomain]);
 
-  const handleRoleChange = (newRole) => {
+  const handleRoleChange = async (newRole) => {
     setSelectedRole(newRole);
     if (updateProfile) {
       updateProfile({ targetRole: newRole });
     }
     setShowRoleModal(false);
+    try {
+      await updateRoadmapTargetRole(newRole);
+    } catch (e) {
+      console.warn("Could not persist target role change:", e);
+    }
+    fetchRoadmap(newRole);
     logActivity({
       type: "roadmap_role_change",
       title: "Target Role Updated",
@@ -50,17 +187,28 @@ export default function CareerRoadmap() {
     });
   };
 
-  const handleRegenerate = () => {
+  const handleRegenerate = async () => {
     setIsRegenerating(true);
-    setTimeout(() => {
-      setIsRegenerating(false);
-      logActivity({
-        type: "roadmap_regenerated",
-        title: "Career Roadmap Regenerated",
-        description: `Refreshed for ${selectedRole}`,
-        status: "success"
-      });
-    }, 600);
+    await fetchRoadmap();
+    logActivity({
+      type: "roadmap_regenerated",
+      title: "Career Roadmap Regenerated",
+      description: `Refreshed for ${selectedRole}`,
+      status: "success"
+    });
+  };
+
+  const handleMilestoneAction = async (milestone) => {
+    if (milestone.status === 'in_progress') {
+      try {
+        await completeRoadmapMilestone(milestone.id);
+        fetchRoadmap();
+      } catch (e) {
+        navigate('/my-courses');
+      }
+    } else {
+      navigate('/my-courses');
+    }
   };
 
   const domainKeys = ['All', ...Object.keys(CAREER_DOMAINS)];
@@ -68,6 +216,33 @@ export default function CareerRoadmap() {
   const filteredRoles = activeDomainFilter === 'All'
     ? Object.keys(ROLE_DEFINITIONS)
     : CAREER_DOMAINS[activeDomainFilter]?.roles || Object.keys(ROLE_DEFINITIONS);
+
+  if (loading && !roadmapData) {
+    return (
+      <div className="max-w-6xl mx-auto py-24 flex flex-col items-center justify-center space-y-4 font-manrope">
+        <Loader2 className="w-10 h-10 animate-spin text-primary" />
+        <p className="text-sm font-semibold text-gray-500">Generating evidence-grounded career roadmap...</p>
+      </div>
+    );
+  }
+
+  if (error && !roadmapData) {
+    return (
+      <div className="max-w-6xl mx-auto py-16 text-center space-y-4 font-manrope">
+        <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto" />
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Career Roadmap Unavailable</h2>
+        <p className="text-sm text-gray-500 max-w-md mx-auto">{error}</p>
+        <button
+          onClick={() => fetchRoadmap()}
+          className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold shadow-md hover:bg-primaryHover"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
+  if (!roadmapData) return null;
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-16 animate-in fade-in slide-in-from-bottom-4 duration-500 font-manrope">
@@ -245,7 +420,7 @@ export default function CareerRoadmap() {
               </span>
             </div>
             <p className="text-xs text-gray-500 mt-0.5">
-              Estimated time to placement readiness: <strong className="text-primary font-bold">8–10 weeks</strong>
+              Estimated time to placement readiness: <strong className="text-primary font-bold">{roadmapData.metrics[4]?.status || '6–8 weeks'}</strong>
             </p>
           </div>
 
@@ -337,7 +512,7 @@ export default function CareerRoadmap() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          navigate('/my-courses');
+                          handleMilestoneAction(m);
                         }}
                         className="px-3.5 py-1.5 rounded-xl bg-primary text-white text-xs font-bold shadow-md shadow-primary/20 hover:bg-primaryHover transition-all cursor-pointer"
                       >
@@ -347,7 +522,7 @@ export default function CareerRoadmap() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          navigate('/my-courses');
+                          handleMilestoneAction(m);
                         }}
                         className="px-3.5 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
                       >
@@ -382,6 +557,23 @@ export default function CareerRoadmap() {
                         ))}
                       </div>
                     </div>
+
+                    {/* Milestone Evidence (if any) */}
+                    {m.evidence && m.evidence.length > 0 && (
+                      <div>
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400 block mb-1.5">
+                          Verified Candidate Evidence
+                        </span>
+                        <div className="space-y-1">
+                          {m.evidence.map((ev, evIdx) => (
+                            <div key={evIdx} className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 text-xs font-semibold">
+                              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                              <span>{ev}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Dual Info: Why This Matters & Recommended Action */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">

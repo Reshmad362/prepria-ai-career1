@@ -212,6 +212,17 @@ def evaluate_interview_session(
                 "roleKnowledge": 0,
                 "confidence": 0
             },
+            "speech_metrics": {
+                "total_filler_count": 0,
+                "filler_breakdown": {},
+                "filler_rate": None,
+                "words_per_minute": None,
+                "total_words": 0,
+                "speaking_duration_seconds": 0,
+                "pause_count": 0,
+                "long_pauses": 0,
+                "speech_observations": ["No speech detected for evaluation."]
+            },
             "questionEvaluations": question_evaluations,
             "strengths": [],
             "improvements": [],
@@ -219,6 +230,70 @@ def evaluate_interview_session(
             "completedAt": None,
             "message": "You did not submit any responses (0 of " + str(total_questions) + " answered), so PREPRIA cannot evaluate your performance."
         }
+
+    # Aggregate speech metrics across answered questions
+    total_fillers = 0
+    aggregate_filler_breakdown = {}
+    total_spoken_words = 0
+    total_speaking_duration = 0
+    total_pauses = 0
+    total_long_pauses = 0
+
+    for qe in question_evaluations:
+        if qe.get("status") == "answered":
+            sp = qe.get("speech_analysis") or {}
+            f_count = sp.get("filler_count", 0)
+            total_fillers += f_count
+            for f_word, count in sp.get("filler_breakdown", {}).items():
+                aggregate_filler_breakdown[f_word] = aggregate_filler_breakdown.get(f_word, 0) + count
+            total_spoken_words += sp.get("words", 0)
+            total_speaking_duration += sp.get("duration_seconds", 0)
+            total_pauses += sp.get("pause_count", 0)
+            total_long_pauses += sp.get("long_pauses", 0)
+
+    # Calculate deterministic aggregate WPM and filler rate
+    wpm_aggregate = None
+    if total_speaking_duration > 0 and total_spoken_words > 0:
+        wpm_aggregate = round(total_spoken_words / (total_speaking_duration / 60.0), 1)
+
+    filler_rate_per_100_words = None
+    if total_spoken_words > 0:
+        filler_rate_per_100_words = round((total_fillers / total_spoken_words) * 100, 1)
+
+    # Sort filler breakdown deterministically by count descending, then word ascending
+    sorted_filler_breakdown = dict(
+        sorted(aggregate_filler_breakdown.items(), key=lambda item: (-item[1], item[0]))
+    )
+
+    # Speech observations & actionable recommendations
+    speech_observations = []
+    if total_fillers == 0 and total_spoken_words > 0:
+        speech_observations.append("Excellent speech clarity with zero filler words detected.")
+    elif total_fillers > 0 and sorted_filler_breakdown:
+        top_filler, top_count = next(iter(sorted_filler_breakdown.items()))
+        speech_observations.append(
+            f"Your most frequent filler was '{top_filler}' ({top_count} occurrence{'s' if top_count > 1 else ''}). Practice replacing it with a deliberate short pause."
+        )
+
+    if wpm_aggregate is not None:
+        if wpm_aggregate > 165:
+            speech_observations.append(f"Speaking rate was fast ({wpm_aggregate} WPM). Aim for 120–150 WPM for maximum clarity and executive presence.")
+        elif wpm_aggregate < 95:
+            speech_observations.append(f"Speaking rate was slow ({wpm_aggregate} WPM). Practice structuring responses to maintain steady momentum.")
+        else:
+            speech_observations.append(f"Speaking pace is optimal ({wpm_aggregate} WPM) within the conversational executive range.")
+
+    session_speech_metrics = {
+        "total_filler_count": total_fillers,
+        "filler_breakdown": sorted_filler_breakdown,
+        "filler_rate": filler_rate_per_100_words,
+        "words_per_minute": wpm_aggregate,
+        "total_words": total_spoken_words,
+        "speaking_duration_seconds": total_speaking_duration,
+        "pause_count": total_pauses,
+        "long_pauses": total_long_pauses,
+        "speech_observations": speech_observations
+    }
 
     # Calculate 5-Pillar dimensions
     avg_tech = int(round(sum(tech_scores) / len(tech_scores))) if tech_scores else 50
@@ -294,9 +369,11 @@ def evaluate_interview_session(
             "roleKnowledge": avg_role,
             "confidence": avg_conf
         },
+        "speech_metrics": session_speech_metrics,
         "questionEvaluations": question_evaluations,
         "strengths": strengths,
         "improvements": improvements,
         "nextInterviewFocus": [q["topic"] for q in answered_evals_sorted[-2:]] if len(answered_evals_sorted) >= 2 else ["System Fundamentals"],
         "completedAt": datetime.utcnow().strftime("%b %d, %Y")
     }
+

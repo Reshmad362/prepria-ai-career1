@@ -114,6 +114,52 @@ SKILL_TO_COURSE_MAP: Dict[str, Dict[str, str]] = {
     "system architecture": {"courseId": "system-design-mastery", "title": "Scalable System Architecture & Microservices"}
 }
 
+# ─── Canonical External Learning Resources (Phase 18 Verified Links) ─────────
+SKILL_TO_EXTERNAL_RESOURCE_MAP: Dict[str, Dict[str, Any]] = {
+    "aws": {
+        "provider": "Coursera",
+        "resourceTitle": "AWS Cloud Technical Essentials",
+        "url": "https://www.coursera.org/learn/aws-cloud-technical-essentials",
+        "skill": "AWS"
+    },
+    "terraform": {
+        "provider": "Udemy",
+        "resourceTitle": "HashiCorp Certified: Terraform Associate",
+        "url": "https://www.udemy.com/course/terraform-beginner-to-advanced/",
+        "skill": "Terraform"
+    },
+    "kubernetes": {
+        "provider": "edX",
+        "resourceTitle": "Introduction to Kubernetes (Linux Foundation)",
+        "url": "https://www.edx.org/learn/kubernetes/the-linux-foundation-introduction-to-kubernetes",
+        "skill": "Kubernetes"
+    },
+    "cloud engineering": {
+        "provider": "Infosys Springboard",
+        "resourceTitle": "Cloud Computing Fundamentals & Architecture",
+        "url": "https://infyspringboard.onwingspan.com/",
+        "skill": "Cloud Engineering"
+    },
+    "machine learning": {
+        "provider": "Coursera",
+        "resourceTitle": "Machine Learning Specialization (DeepLearning.AI)",
+        "url": "https://www.coursera.org/specializations/machine-learning-introduction",
+        "skill": "Machine Learning"
+    },
+    "nlp": {
+        "provider": "Coursera",
+        "resourceTitle": "Natural Language Processing Specialization",
+        "url": "https://www.coursera.org/specializations/natural-language-processing",
+        "skill": "NLP"
+    },
+    "professional skills": {
+        "provider": "Infosys Springboard",
+        "resourceTitle": "Infosys Springboard Professional Learning Pathways",
+        "url": "https://infyspringboard.onwingspan.com/",
+        "skill": "Professional Skills"
+    }
+}
+
 
 def _make_recommendation_id(email: str, rec_type: str, topic_slug: str) -> str:
     """Generates a stable, deterministic recommendation ID based on email, type, and topic."""
@@ -243,33 +289,68 @@ def generate_recommendations_for_user(user_email: str) -> List[Dict[str, Any]]:
             "weight": weight
         })
 
-        # Check if mapped to a Learning Hub Course
+        # Check if mapped to a Learning Hub Course or External Resource
         mapped_course = None
         for key_s, course_info in SKILL_TO_COURSE_MAP.items():
             if key_s in weak_lower or weak_lower in key_s:
                 mapped_course = course_info
                 break
 
+        mapped_external = None
+        for key_ext, ext_info in SKILL_TO_EXTERNAL_RESOURCE_MAP.items():
+            if key_ext in weak_lower or weak_lower in key_ext:
+                mapped_external = ext_info
+                break
+
         if mapped_course:
             course_id = mapped_course["courseId"]
-            # Do NOT recommend completed courses as new learning items
-            if course_id not in completed_courses:
-                l_rec_id = _make_recommendation_id(email_clean, "learning", f"{weak_topic}_{course_id}")
-                candidates.append({
-                    "recommendationId": l_rec_id,
-                    "userId": email_clean,
-                    "type": "learning",
-                    "title": f"Enroll in {mapped_course['title']}",
-                    "description": f"Take the '{mapped_course['title']}' course in the Learning Hub to resolve your '{weak_topic}' gap.",
-                    "priority": "high" if is_persistent else "medium",
-                    "reason": f"Directly addresses verified interview weakness '{weak_topic}'.",
-                    "source": "learning_hub",
-                    "sourceEvidence": evidence + [f"Course '{course_id}' directly addresses '{weak_topic}'"],
-                    "relatedSkill": weak_topic,
-                    "relatedTopic": weak_topic,
-                    "relatedCourseId": course_id,
-                    "weight": weight + 5
-                })
+            # Check if user already completed this native course
+            is_completed = course_id in completed_courses
+            l_rec_id = _make_recommendation_id(email_clean, "learning", f"{weak_topic}_{course_id}")
+            candidates.append({
+                "recommendationId": l_rec_id,
+                "userId": email_clean,
+                "type": "learning",
+                "title": f"Enroll in {mapped_course['title']}",
+                "description": f"Take the '{mapped_course['title']}' course in the Learning Hub to resolve your '{weak_topic}' gap.",
+                "priority": "high" if is_persistent else "medium",
+                "reason": f"Directly addresses verified interview weakness '{weak_topic}'.",
+                "source": "learning_hub",
+                "sourceEvidence": evidence + [f"Native Course '{course_id}' directly addresses '{weak_topic}'"],
+                "relatedSkill": weak_topic,
+                "relatedTopic": weak_topic,
+                "relatedCourseId": course_id,
+                "resourceType": "native",
+                "provider": "PREPRIA Learning Hub",
+                "url": f"/course/{course_id}",
+                "isExternal": False,
+                "verificationStatus": "native_authoritative",
+                "isCompleted": is_completed,
+                "weight": weight + (5 if not is_completed else -20)
+            })
+
+        if mapped_external:
+            ext_rec_id = _make_recommendation_id(email_clean, "external_learning", f"{weak_topic}_{mapped_external['provider']}")
+            candidates.append({
+                "recommendationId": ext_rec_id,
+                "userId": email_clean,
+                "type": "external_learning",
+                "title": f"{mapped_external['provider']}: {mapped_external['resourceTitle']}",
+                "description": f"Recommended external curriculum on {mapped_external['provider']} covering {mapped_external['skill']}.",
+                "priority": "medium",
+                "reason": f"Targeted external learning resource for verified '{weak_topic}' gap.",
+                "source": "external_provider",
+                "sourceEvidence": evidence + [f"Verified external resource on {mapped_external['provider']}"],
+                "relatedSkill": mapped_external["skill"],
+                "relatedTopic": weak_topic,
+                "relatedCourseId": None,
+                "resourceType": "external",
+                "provider": mapped_external["provider"],
+                "url": mapped_external["url"],
+                "isExternal": True,
+                "verificationStatus": "unverified_external",
+                "weight": weight + 2
+            })
 
     # ─── RULE B: Low Interview Dimension Scores ─────────────────────────────────
     if latest_interview:
@@ -303,6 +384,11 @@ def generate_recommendations_for_user(user_email: str) -> List[Dict[str, Any]]:
                 "relatedSkill": "Communication",
                 "relatedTopic": "Behavioral Communication",
                 "relatedCourseId": "behavioral-interview-mastery",
+                "resourceType": "native",
+                "provider": "PREPRIA Learning Hub",
+                "url": "/course/behavioral-interview-mastery",
+                "isExternal": False,
+                "verificationStatus": "native_authoritative",
                 "weight": 35
             })
 
@@ -324,6 +410,11 @@ def generate_recommendations_for_user(user_email: str) -> List[Dict[str, Any]]:
                 "relatedSkill": "Data Structures & Algorithms",
                 "relatedTopic": "Problem Solving",
                 "relatedCourseId": "dsa-interview-prep",
+                "resourceType": "native",
+                "provider": "PREPRIA Learning Hub",
+                "url": "/course/dsa-interview-prep",
+                "isExternal": False,
+                "verificationStatus": "native_authoritative",
                 "weight": 35
             })
 
@@ -337,7 +428,6 @@ def generate_recommendations_for_user(user_email: str) -> List[Dict[str, Any]]:
                 break
 
         if not req_skills:
-            # Fallback required skills for generic technical roles
             req_skills = ["System Architecture", "REST APIs", "Testing", "Data Structures"]
 
         missing_role_skills = [s for s in req_skills if s.lower() not in user_skills_lower]
@@ -351,6 +441,9 @@ def generate_recommendations_for_user(user_email: str) -> List[Dict[str, Any]]:
                 f"Skill '{missing_s}' is not currently listed on your profile/resume"
             ]
 
+            native_course_info = SKILL_TO_COURSE_MAP.get(m_lower)
+            ext_resource_info = SKILL_TO_EXTERNAL_RESOURCE_MAP.get(m_lower)
+
             candidates.append({
                 "recommendationId": rec_id,
                 "userId": email_clean,
@@ -363,7 +456,12 @@ def generate_recommendations_for_user(user_email: str) -> List[Dict[str, Any]]:
                 "sourceEvidence": evidence,
                 "relatedSkill": missing_s,
                 "relatedTopic": missing_s,
-                "relatedCourseId": SKILL_TO_COURSE_MAP.get(m_lower, {}).get("courseId"),
+                "relatedCourseId": native_course_info.get("courseId") if native_course_info else None,
+                "resourceType": "native" if native_course_info else ("external" if ext_resource_info else "action"),
+                "provider": native_course_info.get("title") if native_course_info else (ext_resource_info.get("provider") if ext_resource_info else "PREPRIA Platform"),
+                "url": f"/course/{native_course_info['courseId']}" if native_course_info else (ext_resource_info.get("url") if ext_resource_info else None),
+                "isExternal": bool(ext_resource_info and not native_course_info),
+                "verificationStatus": "native_authoritative" if native_course_info else ("unverified_external" if ext_resource_info else "action"),
                 "weight": 22
             })
 
@@ -386,6 +484,11 @@ def generate_recommendations_for_user(user_email: str) -> List[Dict[str, Any]]:
             "relatedSkill": "Resume Intelligence",
             "relatedTopic": "ATS Optimization",
             "relatedCourseId": None,
+            "resourceType": "action",
+            "provider": "PREPRIA Resume Intelligence",
+            "url": "/resume-upload",
+            "isExternal": False,
+            "verificationStatus": "native_authoritative",
             "weight": 38
         })
     elif ats_score is not None and ats_score < 75:
@@ -406,6 +509,11 @@ def generate_recommendations_for_user(user_email: str) -> List[Dict[str, Any]]:
             "relatedSkill": "ATS Optimization",
             "relatedTopic": "Resume Keywords",
             "relatedCourseId": None,
+            "resourceType": "action",
+            "provider": "PREPRIA Resume Intelligence",
+            "url": "/resume-intelligence",
+            "isExternal": False,
+            "verificationStatus": "native_authoritative",
             "weight": 20
         })
 
@@ -428,6 +536,11 @@ def generate_recommendations_for_user(user_email: str) -> List[Dict[str, Any]]:
             "relatedSkill": target_role,
             "relatedTopic": "Mock Interview Baseline",
             "relatedCourseId": None,
+            "resourceType": "action",
+            "provider": "PREPRIA Interview Studio",
+            "url": "/role-interviews",
+            "isExternal": False,
+            "verificationStatus": "native_authoritative",
             "weight": 36
         })
 
@@ -452,9 +565,14 @@ def generate_recommendations_for_user(user_email: str) -> List[Dict[str, Any]]:
         existing = user_rec_store.get(r_id)
         
         status = existing.get("status", "new") if existing else "new"
+        
+        # If native course is completed, automatically sync status to completed
+        if cand.get("relatedCourseId") and cand.get("relatedCourseId") in completed_courses:
+            status = "completed"
+
         created_at = existing.get("createdAt", now_iso) if existing else now_iso
 
-        # Build clean output record matching exact Phase 8 schema
+        # Build clean output record
         rec_record = {
             "recommendationId": r_id,
             "userId": email_clean,
@@ -468,6 +586,11 @@ def generate_recommendations_for_user(user_email: str) -> List[Dict[str, Any]]:
             "relatedSkill": cand.get("relatedSkill"),
             "relatedTopic": cand.get("relatedTopic"),
             "relatedCourseId": cand.get("relatedCourseId"),
+            "resourceType": cand.get("resourceType", "action"),
+            "provider": cand.get("provider", "PREPRIA Platform"),
+            "url": cand.get("url"),
+            "isExternal": cand.get("isExternal", False),
+            "verificationStatus": cand.get("verificationStatus", "native_authoritative"),
             "status": status,
             "createdAt": created_at,
             "updatedAt": now_iso
@@ -503,21 +626,20 @@ def get_user_recommendations(user_email: str, status_filter: Optional[str] = Non
 
 def update_recommendation_status(user_email: str, recommendation_id: str, new_status: str) -> Dict[str, Any]:
     """
-    Updates status of a recommendation ('new', 'in_progress', 'completed', 'dismissed').
-    Enforces user ownership and persists changes.
+    Updates status of a recommendation ('new', 'in_progress', 'completed', 'dismissed', 'external_self_reported').
+    Enforces user ownership and distinguishes native vs external completion boundaries.
     """
     email_clean = str(user_email or "").strip().lower()
     clean_rec_id = str(recommendation_id or "").strip()
     clean_status = str(new_status or "").strip().lower()
 
-    valid_statuses = {"new", "in_progress", "completed", "dismissed"}
+    valid_statuses = {"new", "in_progress", "completed", "dismissed", "external_self_reported"}
     if clean_status not in valid_statuses:
         raise ValueError(f"Invalid status '{new_status}'. Must be one of: {', '.join(sorted(valid_statuses))}")
 
     # Ensure user store is loaded
     user_rec_store = recommendations_db.get(email_clean)
     if not user_rec_store or clean_rec_id not in user_rec_store:
-        # Generate recommendations to ensure record exists
         generate_recommendations_for_user(email_clean)
         user_rec_store = recommendations_db.get(email_clean, {})
 
@@ -525,11 +647,18 @@ def update_recommendation_status(user_email: str, recommendation_id: str, new_st
         raise ValueError("Recommendation not found.")
 
     rec = user_rec_store[clean_rec_id]
-    rec["status"] = clean_status
+    
+    # Critical Completion Boundary: If an external course is marked completed, label as external_self_reported
+    if rec.get("isExternal") and clean_status == "completed":
+        rec["status"] = "external_self_reported"
+        rec["verificationStatus"] = "self_reported"
+    else:
+        rec["status"] = clean_status
+
     rec["updatedAt"] = datetime.utcnow().isoformat()
 
     recommendations_db[email_clean] = user_rec_store
     _save_recommendations_to_disk()
 
-    logger.info("Updated recommendation %s status to '%s' for user %s", clean_rec_id, clean_status, email_clean)
+    logger.info("Updated recommendation %s status to '%s' for user %s", clean_rec_id, rec["status"], email_clean)
     return rec

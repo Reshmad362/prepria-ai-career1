@@ -100,5 +100,134 @@
       "createdAt": "2026-09-25T17:59:36.405862",
       "updatedAt": "2026-09-25T17:59:36.405862"
     }
+  },
+  "reshmad362@gmail.com": {
+    "rec_22b18e3f8f2d": {
+      "recommendationId": "rec_22b18e3f8f2d",
+      "userId": "reshmad362@gmail.com",
+      "type": "interview",
+      "title": "Complete Baseline Mock Interview for Full stack developer",
+      "description": "Take a baseline AI mock interview for 'Full stack developer' to evaluate technical readiness and establish benchmark metrics.",
+      "priority": "high",
+      "reason": "No mock interviews completed for target role 'Full stack developer'.",
+      "source": "interview_history",
+      "sourceEvidence": [
+        "Candidate selected target role 'Full stack developer'",
+        "No completed interview sessions recorded in interview history"
+      ],
+      "relatedSkill": "Full stack developer",
+      "relatedTopic": "Mock Interview Baseline",
+      "relatedCourseId": null,
+      "resourceType": "action",
+      "provider": "PREPRIA Interview Studio",
+      "url": "/role-interviews",
+      "isExternal": false,
+      "verificationStatus": "native_authoritative",
+      "status": "new",
+      "createdAt": "2026-09-30T17:11:26.523577",
+      "updatedAt": "2026-10-01T08:18:04.195144"
+    },
+    "rec_0bc436a387ff": {
+      "recommendationId": "rec_0bc436a387ff",
+      "userId": "reshmad362@gmail.com",
+      "type": "role_gap",
+      "title": "Acquire SQL for Full stack developer Role",
+      "description": "Develop 'SQL' proficiency to close the gap between your candidate profile and 'Full stack developer' requirements.",
+      "priority": "medium",
+      "reason": "Target role 'Full stack developer' requires 'SQL', which is missing from your profile.",
+      "source": "role_gap",
+      "sourceEvidence": [
+        "Target role 'Full stack developer' requires competency in 'SQL'",
+        "Skill 'SQL' is not currently listed on your profile/resume"
+      ],
+      "relatedSkill": "SQL",
+      "relatedTopic": "SQL",
+      "relatedCourseId": "sql-database-optimization",
+      "resourceType": "native",
+      "provider": "Database Architecture & SQL Performance Optimization",
+      "url": "/course/sql-database-optimization",
+      "isExternal": false,
+      "verificationStatus": "native_authoritative",
+      "status": "new",
+      "createdAt": "2026-09-30T17:11:26.523577",
+      "updatedAt": "2026-10-01T08:18:04.195144"
+    },
+    "rec_7eba055fd19e": {
+      "recommendationId": "rec_7eba055fd19e",
+      "userId": "reshmad362@gmail.com",
+      "type": "role_gap",
+      "title": "Acquire System Architecture for Full stack developer Role",
+      "description": "Develop 'System Architecture' proficiency to close the gap between your candidate profile and 'Full stack developer' requirements.",
+      "priority": "medium",
+      "reason": "Target role 'Full stack developer' requires 'System Architecture', which is missing from your profile.",
+      "source": "role_gap",
+      "sourceEvidence": [
+        "Target role 'Full stack developer' requires competency in 'System Architecture'",
+        "Skill 'System Architecture' is not currently listed on your profile/resume"
+      ],
+      "relatedSkill": "System Architecture",
+      "relatedTopic": "System Architecture",
+      "relatedCourseId": "system-design-mastery",
+      "resourceType": "native",
+      "provider": "Scalable System Architecture & Microservices",
+      "url": "/course/system-design-mastery",
+      "isExternal": false,
+      "verificationStatus": "native_authoritative",
+      "status": "new",
+      "createdAt": "2026-09-30T17:11:26.523577",
+      "updatedAt": "2026-10-01T08:18:04.195144"
+    },
+    "rec_c4af0132a85b": {
+      "recommendationId": "rec_c4af0132a85b",
+      "userId": "reshmad362@gmail.com",
+      "type": "role_gap",
+      "title": "Acquire REST APIs for Full stack developer Role",
+      "description": "Develop 'REST APIs' proficiency to close the gap between your candidate profile and 'Full stack developer' requirements.",
+      "priority": "medium",
+      "reason": "Target role 'Full stack developer' requires 'REST APIs', which is missing from your profile.",
+      "source": "role_gap",
+      "sourceEvidence": [
+        "Target role 'Full stack developer' requires competency in 'REST APIs'",
+        "Skill 'REST APIs' is not currently listed on your profile/resume"
+      ],
+      "relatedSkill": "REST APIs",
+      "relatedTopic": "REST APIs",
+      "relatedCourseId": "be-101",
+      "resourceType": "native",
+      "provider": "Backend Development Fundamentals",
+      "url": "/course/be-101",
+      "isExternal": false,
+      "verificationStatus": "native_authoritative",
+      "status": "new",
+      "createdAt": "2026-09-30T17:11:26.523577",
+      "updatedAt": "2026-10-01T08:18:04.195144"
+    }
+  },
+  "e2e_candidate_a@prepria.test": {
+    "rec_47fe4e18fa8c": {
+      "recommendationId": "rec_47fe4e18fa8c",
+      "userId": "e2e_candidate_a@prepria.test",
+      "type": "resume",
+      "title": "Upload PDF Resume for ATS & Skill Extraction",
+      "description": "Upload your resume in PDF format to enable automated skill extraction, ATS scoring, and targeted role alignment.",
+      "priority": "high",
+      "reason": "No resume uploaded. Uploading a resume unlocks accurate role gap analysis.",
+      "source": "resume_analysis",
+      "sourceEvidence": [
+        "No active resume document found on candidate profile",
+        "ATS parser requires resume file for keyword alignment"
+      ],
+      "relatedSkill": "Resume Intelligence",
+      "relatedTopic": "ATS Optimization",
+      "relatedCourseId": null,
+      "resourceType": "action",
+      "provider": "PREPRIA Resume Intelligence",
+      "url": "/resume-upload",
+      "isExternal": false,
+      "verificationStatus": "native_authoritative",
+      "status": "new",
+      "createdAt": "2026-10-01T09:01:15.220772",
+      "updatedAt": "2026-10-01T09:03:07.597477"
+    }
   }
 }

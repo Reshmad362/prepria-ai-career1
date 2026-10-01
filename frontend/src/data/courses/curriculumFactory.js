@@ -22,24 +22,24 @@ const generateCheckpointQuestions = (courseId, mIdx, mTemplate, domain, topics) 
       id: `${qPrefix}-2`,
       question: `How should teams validate implementations of ${mTitle}?`,
       options: [
-        "By running automated tests, measuring key metrics, and validating against business objectives.",
         "By assuming success without monitoring.",
         "By deploying straight to production without peer review.",
+        "By running automated tests, measuring key metrics, and validating against business objectives.",
         "By ignoring edge cases."
       ],
-      correctIndex: 0,
+      correctIndex: 2,
       explanation: "Continuous verification, metric tracking, and testing ensure production reliability and prevent regressions."
     },
     {
       id: `${qPrefix}-3`,
       question: `Which of the following is a common mistake when working with ${t[0] || mTitle}?`,
       options: [
-        "Skipping prerequisite validation and environment dependency checks.",
         "Following the official documentation step by step.",
+        "Skipping prerequisite validation and environment dependency checks.",
         "Writing comprehensive unit tests before deployment.",
         "Conducting thorough code reviews with team members."
       ],
-      correctIndex: 0,
+      correctIndex: 1,
       explanation: "Skipping validation steps leads to unreliable deployments and hard-to-debug production failures."
     },
     {
@@ -47,23 +47,23 @@ const generateCheckpointQuestions = (courseId, mIdx, mTemplate, domain, topics) 
       question: `What is the recommended approach when implementing ${t[1] || 'key concepts'} in a production environment?`,
       options: [
         "Deploy directly to production without any staging environment testing.",
-        "Test in an isolated staging environment, monitor metrics, then promote to production.",
         "Disable all monitoring to reduce overhead costs.",
-        "Use only manual processes and avoid any automation."
+        "Use only manual processes and avoid any automation.",
+        "Test in an isolated staging environment, monitor metrics, then promote to production."
       ],
-      correctIndex: 1,
+      correctIndex: 3,
       explanation: "Staging environment testing with monitoring ensures reliability before production promotion."
     },
     {
       id: `${qPrefix}-5`,
       question: `Why is documentation important when implementing ${mTitle}?`,
       options: [
+        "It ensures knowledge transfer, reduces onboarding time, and creates reproducible procedures.",
         "Documentation is never needed for professional workflows.",
         "It helps marketing teams write blog posts about the product.",
-        "It ensures knowledge transfer, reduces onboarding time, and creates reproducible procedures.",
         "It is only required by external auditors and has no internal value."
       ],
-      correctIndex: 2,
+      correctIndex: 0,
       explanation: "Documentation enables knowledge transfer, reduces bus-factor risk, and ensures operational consistency."
     },
     {
@@ -72,10 +72,10 @@ const generateCheckpointQuestions = (courseId, mIdx, mTemplate, domain, topics) 
       options: [
         "Immediately restart all services without investigation.",
         "Delete the entire configuration and start from scratch.",
-        "Check logs, review recent changes, and reproduce the issue in a safe environment.",
-        "Ignore the issue and wait for it to resolve itself."
+        "Ignore the issue and wait for it to resolve itself.",
+        "Check logs, review recent changes, and reproduce the issue in a safe environment."
       ],
-      correctIndex: 2,
+      correctIndex: 3,
       explanation: "Systematic troubleshooting with log analysis and change review prevents destructive guesswork."
     },
     {
@@ -83,11 +83,11 @@ const generateCheckpointQuestions = (courseId, mIdx, mTemplate, domain, topics) 
       question: `What role does continuous improvement play in ${domain} workflows related to ${mTitle}?`,
       options: [
         "It is unnecessary once a system is deployed to production.",
-        "It only applies during the initial development phase.",
         "It ensures systems evolve with changing requirements, security patches, and performance optimizations.",
+        "It only applies during the initial development phase.",
         "It is exclusively the responsibility of management, not engineers."
       ],
-      correctIndex: 2,
+      correctIndex: 1,
       explanation: "Continuous improvement ensures systems remain secure, performant, and aligned with evolving business needs."
     }
   ];

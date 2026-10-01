@@ -204,10 +204,23 @@ export const saveCourseProgressRecord = async (courseId, progressData, email = '
     if (res.ok) {
       const result = await res.json();
       if (result?.success && result?.data) {
-        // Overwrite local progress with the backend-validated record.
-        localStorage.setItem(localKey, JSON.stringify(result.data));
+        // Monotonic merge to prevent any race condition with local state
+        let localCurrent = {};
+        try {
+          localCurrent = JSON.parse(localStorage.getItem(localKey) || "{}");
+        } catch (err) {}
+        const mergedCompleted = Array.from(new Set([
+          ...(result.data.completedItemIds || []),
+          ...(localCurrent.completedItemIds || []),
+          ...(progressData.completedItemIds || [])
+        ]));
+        const mergedRecord = {
+          ...result.data,
+          completedItemIds: mergedCompleted
+        };
+        localStorage.setItem(localKey, JSON.stringify(mergedRecord));
         window.dispatchEvent(new Event("progressUpdated"));
-        return result.data;
+        return mergedRecord;
       }
     }
   } catch (e) {

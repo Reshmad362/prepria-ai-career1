@@ -126,18 +126,42 @@ def get_course_catalog_entry(course_id: str, course_def: Optional[Dict[str, Any]
 
     if course_def and isinstance(course_def, dict) and course_def.get("modules"):
         mods = []
+        item_reqs_in_def = course_def.get("itemRequirements") or {}
         for m in course_def.get("modules", []):
             mod_id = m.get("id") or f"{clean_id}-mod-{len(mods)+1}"
             raw_items = m.get("items") or m.get("lessons") or []
+            if not raw_items and m.get("itemIds"):
+                raw_items = m.get("itemIds")
             parsed_items = []
             for it in raw_items:
-                parsed_items.append({
-                    "id": it.get("id"),
-                    "type": it.get("type", "READING"),
-                    "requiredDurationSeconds": it.get("requiredDurationSeconds", DEFAULT_REQUIRED_DURATION_SECONDS),
-                    "required": it.get("required", True),
-                    "questions": it.get("quiz", {}).get("questions") if it.get("type") == "QUIZ" else it.get("questions", [])
-                })
+                if isinstance(it, str):
+                    it_id = it
+                    req = item_reqs_in_def.get(it_id, {})
+                    it_type = req.get("type", "QUIZ" if "quiz" in it_id.lower() else "READING")
+                    it_dur = req.get("requiredDurationSeconds", DEFAULT_REQUIRED_DURATION_SECONDS)
+                    it_req = req.get("required", True)
+                    parsed_items.append({
+                        "id": it_id,
+                        "type": it_type,
+                        "requiredDurationSeconds": it_dur,
+                        "required": it_req,
+                        "questions": []
+                    })
+                elif isinstance(it, dict):
+                    it_id = it.get("id")
+                    if not it_id:
+                        continue
+                    req = item_reqs_in_def.get(it_id, {})
+                    it_type = it.get("type") or req.get("type", "QUIZ" if "quiz" in it_id.lower() else "READING")
+                    it_dur = it.get("requiredDurationSeconds") or req.get("requiredDurationSeconds", DEFAULT_REQUIRED_DURATION_SECONDS)
+                    it_req = it.get("required") if "required" in it else req.get("required", True)
+                    parsed_items.append({
+                        "id": it_id,
+                        "type": it_type,
+                        "requiredDurationSeconds": it_dur,
+                        "required": it_req,
+                        "questions": it.get("quiz", {}).get("questions") if it_type == "QUIZ" else it.get("questions", [])
+                    })
             mods.append({
                 "id": mod_id,
                 "title": m.get("title", f"Module {len(mods)+1}"),
@@ -163,11 +187,12 @@ def get_course_catalog_entry(course_id: str, course_def: Optional[Dict[str, Any]
     # Standardized dynamic generator for full catalog coverage
     title = clean_id.replace("-", " ").title()
     mods = []
-    # Generate 8 modules matching standard frontend curriculumFactory pattern
+    # Generate 8 modules matching standard frontend curriculumFactory pattern (7 x 4 lessons + 1 x 3 lessons = 31 lessons + 8 quizzes = 39 items)
     for m in range(1, 9):
         mod_id = f"{clean_id}-mod-{m}"
         mod_items = []
-        for l in range(1, 5):
+        num_lessons = 3 if m == 8 else 4
+        for l in range(1, num_lessons + 1):
             mod_items.append({
                 "id": f"{clean_id}-m{m}-l{l}",
                 "type": "PRACTICAL" if l >= 3 else "READING",
@@ -181,8 +206,8 @@ def get_course_catalog_entry(course_id: str, course_def: Optional[Dict[str, Any]
             "requiredDurationSeconds": DEFAULT_REQUIRED_DURATION_SECONDS,
             "required": True,
             "questions": [
-                {"id": "q1", "correctIndex": 0, "question": f"Key principle of {title} Module {m}?"},
-                {"id": "q2", "correctIndex": 1, "question": f"Production pattern for {title} Module {m}?"}
+                {"id": f"q-{clean_id}-m{m}-1", "correctIndex": 0, "question": f"Key principle of {title} Module {m}?"},
+                {"id": f"q-{clean_id}-m{m}-2", "correctIndex": 1, "question": f"Production pattern for {title} Module {m}?"}
             ]
         })
         mods.append({
@@ -203,8 +228,8 @@ def get_course_catalog_entry(course_id: str, course_def: Optional[Dict[str, Any]
             "title": f"{title} Final Certification Exam",
             "passingScore": DEFAULT_PASSING_SCORE,
             "questions": [
-                {"id": "fa-1", "correctIndex": 0, "question": f"Mastery evaluation for {title} Question 1"},
-                {"id": "fa-2", "correctIndex": 1, "question": f"Mastery evaluation for {title} Question 2"}
+                {"id": f"fa-{clean_id}-1", "correctIndex": 0, "question": f"Mastery evaluation for {title} Question 1"},
+                {"id": f"fa-{clean_id}-2", "correctIndex": 1, "question": f"Mastery evaluation for {title} Question 2"}
             ]
         }
     }

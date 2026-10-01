@@ -1,8 +1,106 @@
 /**
- * PREPRIA Standalone A4 Landscape Certificate PDF Generator
- * Zero external dependencies. Generates a pristine 300 DPI A4 Landscape PDF directly in-browser.
- * Exact Light Certificate Composition.
+ * PREPRIA Canonical Certificate PDF Generator
+ * 
+ * Unifies In-App Preview & Downloaded PDF under ONE canonical mathematical layout model.
+ * Produces a pristine 300 DPI A4 Landscape PDF directly in-browser with 100% visual parity
+ * to the in-app certificate component (proportions, typography hierarchy, colors, dual gold
+ * borders, corner brackets, verified emblem seal, signatures, course title box, and footer metadata).
  */
+
+// Shared Canonical Design Constants (1050x742 base coordinates scaled to 300 DPI 2380x1684)
+export const CERT_BASE_WIDTH = 1050;
+export const CERT_BASE_HEIGHT = 742;
+export const CERT_EXPORT_WIDTH = 2380;
+export const CERT_EXPORT_HEIGHT = 1684;
+const SCALE = CERT_EXPORT_WIDTH / CERT_BASE_WIDTH; // 2.266666667
+
+/**
+ * Draws a 5-pointed star icon on canvas
+ */
+function drawStar(ctx, cx, cy, spikes, outerRadius, innerRadius, fillStyle) {
+  let rot = (Math.PI / 2) * 3;
+  let x = cx;
+  let y = cy;
+  const step = Math.PI / spikes;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - outerRadius);
+  for (let i = 0; i < spikes; i++) {
+    x = cx + Math.cos(rot) * outerRadius;
+    y = cy + Math.sin(rot) * outerRadius;
+    ctx.lineTo(x, y);
+    rot += step;
+
+    x = cx + Math.cos(rot) * innerRadius;
+    y = cy + Math.sin(rot) * innerRadius;
+    ctx.lineTo(x, y);
+    rot += step;
+  }
+  ctx.lineTo(cx, cy - outerRadius);
+  ctx.closePath();
+  ctx.fillStyle = fillStyle;
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * Draws a ShieldCheck vector icon on canvas
+ */
+function drawShieldCheck(ctx, x, y, size, color) {
+  ctx.save();
+  ctx.translate(x, y);
+  const s = size / 24;
+  ctx.scale(s, s);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Shield Path
+  ctx.beginPath();
+  ctx.moveTo(12, 22);
+  ctx.bezierCurveTo(12, 22, 20, 18, 20, 12);
+  ctx.lineTo(20, 5);
+  ctx.lineTo(12, 2);
+  ctx.lineTo(4, 5);
+  ctx.lineTo(4, 12);
+  ctx.bezierCurveTo(4, 18, 12, 22, 12, 22);
+  ctx.stroke();
+
+  // Checkmark Path
+  ctx.beginPath();
+  ctx.moveTo(9, 12);
+  ctx.lineTo(11, 14);
+  ctx.lineTo(15, 10);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/**
+ * Wraps text onto multiple lines given a max width and returns lines array
+ */
+function getWrappedLines(ctx, text, maxWidth) {
+  const words = String(text || '').trim().split(/\s+/);
+  const lines = [];
+  let currentLine = '';
+
+  for (let i = 0; i < words.length; i++) {
+    const testLine = currentLine ? `${currentLine} ${words[i]}` : words[i];
+    const metrics = ctx.measureText(testLine);
+    if (metrics.width > maxWidth && currentLine) {
+      lines.push(currentLine);
+      currentLine = words[i];
+    } else {
+      currentLine = testLine;
+    }
+  }
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+  return lines;
+}
 
 export async function generateCertificatePDF({
   recipientName,
@@ -13,50 +111,57 @@ export async function generateCertificatePDF({
   issueDate,
   verificationUrl = 'prepria.com/verify'
 }) {
-  // 1. Ensure document fonts are fully loaded
+  // 1. Ensure document web fonts are active
   if (document.fonts) {
     try {
       await document.fonts.ready;
     } catch (e) {
-      console.warn("Font loading wait skipped:", e);
+      console.warn("Font readiness skipped:", e);
     }
   }
 
-  // 2. Setup A4 Landscape Canvas at High-DPI (2380 x 1684 px -> ~300 DPI for 297mm x 210mm)
-  const width = 2380;
-  const height = 1684;
+  // 2. High-DPI Canvas Initialization (A4 Landscape 2380 x 1684 @ 300 DPI)
+  const width = CERT_EXPORT_WIDTH;
+  const height = CERT_EXPORT_HEIGHT;
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d');
 
   if (!ctx) {
-    throw new Error("Canvas 2D context not supported");
+    throw new Error("Canvas 2D context not available");
   }
 
-  // Enable high-quality anti-aliasing
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
 
+  const centerX = width / 2;
+
   // ──────────────────────────────────────────────────
-  // BASE BACKGROUND & SUBTLE LIGHT TEXTURE
+  // 1. BASE BACKGROUND & RADIAL GLOW & GRID PATTERN
   // ──────────────────────────────────────────────────
-  // Base Pure Canvas
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, width, height);
 
-  // Soft Radial Warm Ivory Glow
-  const bgGlow = ctx.createRadialGradient(width / 2, height / 2, 100, width / 2, height / 2, width * 0.75);
+  // Soft Radial Warm Ivory Glow (matches #FDFBF7 -> #F8F4EC)
+  const bgGlow = ctx.createRadialGradient(centerX, height / 2, 80 * SCALE, centerX, height / 2, width * 0.72);
   bgGlow.addColorStop(0, '#FFFFFF');
-  bgGlow.addColorStop(0.65, '#FDFBF7');
+  bgGlow.addColorStop(0.6, '#FDFBF7');
   bgGlow.addColorStop(1, '#F8F4EC');
   ctx.fillStyle = bgGlow;
   ctx.fillRect(0, 0, width, height);
 
-  // Subtle Geometric Grid
+  // Subtle Center Orange Glow
+  const orangeGlow = ctx.createRadialGradient(centerX, height / 2, 0, centerX, height / 2, width * 0.45);
+  orangeGlow.addColorStop(0, 'rgba(255, 107, 0, 0.03)');
+  orangeGlow.addColorStop(1, 'transparent');
+  ctx.fillStyle = orangeGlow;
+  ctx.fillRect(0, 0, width, height);
+
+  // Geometric 40px Grid Pattern
   ctx.strokeStyle = 'rgba(15, 23, 42, 0.018)';
   ctx.lineWidth = 1.5;
-  const gridSize = 68;
+  const gridSize = 40 * SCALE;
   for (let x = 0; x < width; x += gridSize) {
     ctx.beginPath();
     ctx.moveTo(x, 0);
@@ -71,26 +176,27 @@ export async function generateCertificatePDF({
   }
 
   // ──────────────────────────────────────────────────
-  // DUAL GOLD BORDERS & ORANGE CORNER ACCENTS
+  // 2. DUAL GOLD BORDERS & ORANGE CORNER ACCENTS
   // ──────────────────────────────────────────────────
-  const mOuter = 50;
-  const mInner = 70;
+  const mOuter = 22 * SCALE;
+  const mInner = 30 * SCALE;
 
-  // Outer Gold Border
+  // Outer Gold Border (2px @ base -> 4.5px)
   ctx.strokeStyle = '#C49756';
-  ctx.lineWidth = 3.5;
+  ctx.lineWidth = 2 * SCALE;
   ctx.strokeRect(mOuter, mOuter, width - mOuter * 2, height - mOuter * 2);
 
-  // Inner Subtle Gold Border
+  // Inner Subtle Gold Border (1px @ base -> 2.25px)
   ctx.strokeStyle = 'rgba(196, 151, 86, 0.45)';
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 1 * SCALE;
   ctx.strokeRect(mInner, mInner, width - mInner * 2, height - mInner * 2);
 
-  // Corner Accent Brackets in PREPRIA Orange
+  // Corner Accent Brackets in PREPRIA Primary Orange (#FF6B00)
   ctx.strokeStyle = '#FF6B00';
-  ctx.lineWidth = 5.5;
-  const cLen = 45;
-  const cOff = 44;
+  ctx.lineWidth = 3.5 * SCALE;
+  ctx.lineCap = 'square';
+  const cLen = 28 * SCALE;
+  const cOff = 19 * SCALE;
 
   // Top Left
   ctx.beginPath();
@@ -120,261 +226,282 @@ export async function generateCertificatePDF({
   ctx.lineTo(width - cOff, height - cOff - cLen);
   ctx.stroke();
 
-  const centerX = width / 2;
-
   // ──────────────────────────────────────────────────
-  // ZONE 1: TOP HEADER (BRAND + VERIFIED BADGE + TITLE)
+  // 3. ZONE 1: HEADER (LOGO + VERIFIED STATUS + TITLE)
   // ──────────────────────────────────────────────────
-  const badgeSize = 54;
-  const badgeX = 140;
-  const badgeY = 125;
-  const radius = 14;
+  const headerTopY = 38 * SCALE;
+  const logoLeftX = 64 * SCALE;
 
-  // Logo Badge (Left)
+  // Logo Badge (Orange Square with 'P')
+  const logoSize = 32 * SCALE;
+  const logoRadius = 8 * SCALE;
   ctx.save();
-  const badgeGrad = ctx.createLinearGradient(badgeX, badgeY, badgeX + badgeSize, badgeY + badgeSize);
-  badgeGrad.addColorStop(0, '#FF6B00');
-  badgeGrad.addColorStop(1, '#E05D00');
-  ctx.fillStyle = badgeGrad;
+  const logoGrad = ctx.createLinearGradient(logoLeftX, headerTopY, logoLeftX + logoSize, headerTopY + logoSize);
+  logoGrad.addColorStop(0, '#FF6B00');
+  logoGrad.addColorStop(1, '#E05D00');
+  ctx.fillStyle = logoGrad;
   ctx.beginPath();
-  ctx.roundRect(badgeX, badgeY, badgeSize, badgeSize, radius);
+  ctx.roundRect(logoLeftX, headerTopY, logoSize, logoSize, logoRadius);
   ctx.fill();
 
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = '900 30px Manrope, Inter, sans-serif';
+  ctx.font = '900 36px Manrope, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('P', badgeX + badgeSize / 2, badgeY + badgeSize / 2 + 1);
+  ctx.fillText('P', logoLeftX + logoSize / 2, headerTopY + logoSize / 2 + 1);
   ctx.restore();
 
   // Brand Name & Tagline
   ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = '#0F172A';
-  ctx.font = '900 30px Manrope, Inter, sans-serif';
-  ctx.fillText('PREPRIA', badgeX + badgeSize + 16, 150);
+  ctx.font = '900 36px Manrope, sans-serif';
+  ctx.fillText('PREPRIA', logoLeftX + logoSize + 12 * SCALE, headerTopY + 22 * SCALE);
 
   ctx.fillStyle = '#FF6B00';
-  ctx.font = '800 13px Manrope, Inter, sans-serif';
-  ctx.fillText('AI CAREER INTELLIGENCE PLATFORM', badgeX + badgeSize + 17, 174);
+  ctx.font = '800 18px Manrope, sans-serif';
+  ctx.fillText('AI CAREER INTELLIGENCE PLATFORM', logoLeftX + logoSize + 13 * SCALE, headerTopY + 34 * SCALE);
 
-  // Verified Status Pill (Right)
-  const vPillW = 260;
-  const vPillH = 44;
-  const vPillX = width - 140 - vPillW;
-  const vPillY = 130;
+  // Verified Status Pill (Right Aligned)
+  const pillRightX = width - 64 * SCALE;
+  const pillW = 260 * (SCALE / 2.2);
+  const pillH = 32 * SCALE;
+  const pillX = pillRightX - pillW;
+  const pillY = headerTopY + 2 * SCALE;
 
   ctx.fillStyle = '#ECFDF5';
   ctx.strokeStyle = '#A7F3D0';
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 1 * SCALE;
   ctx.beginPath();
-  ctx.roundRect(vPillX, vPillY, vPillW, vPillH, 22);
+  ctx.roundRect(pillX, pillY, pillW, pillH, 9999);
   ctx.fill();
   ctx.stroke();
 
+  // Shield Check Icon & Text
+  drawShieldCheck(ctx, pillX + 14 * SCALE, pillY + 6 * SCALE, 20 * SCALE, '#059669');
   ctx.fillStyle = '#059669';
-  ctx.font = '800 14px Manrope, Inter, sans-serif';
+  ctx.font = '800 21px Manrope, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('✓  VERIFIED CERTIFICATE', vPillX + vPillW / 2, vPillY + 27);
+  ctx.fillText('VERIFIED CERTIFICATE', pillX + pillW / 2 + 10 * SCALE, pillY + 22 * SCALE);
 
   // Certificate Main Title
+  const mainTitleY = headerTopY + 76 * SCALE;
   ctx.textAlign = 'center';
   ctx.fillStyle = '#0F172A';
-  ctx.font = '700 52px Cinzel, "Playfair Display", Georgia, serif';
-  ctx.fillText('CERTIFICATE OF CAREER ACCELERATION & ACHIEVEMENT', centerX, 265);
+  ctx.font = '700 58px Cinzel, "Playfair Display", Georgia, serif';
+  ctx.fillText('CERTIFICATE OF CAREER ACCELERATION & ACHIEVEMENT', centerX, mainTitleY);
 
-  // Gold Divider Line
-  const divGrad = ctx.createLinearGradient(centerX - 200, 0, centerX + 200, 0);
+  // Gold Center Divider Line
+  const divLineW = 180 * SCALE;
+  const divLineY = mainTitleY + 14 * SCALE;
+  const divGrad = ctx.createLinearGradient(centerX - divLineW / 2, 0, centerX + divLineW / 2, 0);
   divGrad.addColorStop(0, 'rgba(196, 151, 86, 0)');
   divGrad.addColorStop(0.5, '#C49756');
   divGrad.addColorStop(1, 'rgba(196, 151, 86, 0)');
   ctx.fillStyle = divGrad;
-  ctx.fillRect(centerX - 200, 282, 400, 2.5);
+  ctx.fillRect(centerX - divLineW / 2, divLineY, divLineW, 2 * SCALE);
 
   // ──────────────────────────────────────────────────
-  // ZONE 2: PRESENTATION, RECIPIENT, COURSE & STATEMENT
+  // 4. ZONE 2: PRESENTATION, RECIPIENT & COURSE TITLE BOX
   // ──────────────────────────────────────────────────
-  // Presentation Label
+  // "THIS IS OFFICIALLY PRESENTED TO"
+  const presLabelY = divLineY + 38 * SCALE;
   ctx.fillStyle = '#64748B';
-  ctx.font = '700 18px Manrope, sans-serif';
-  ctx.fillText('THIS IS OFFICIALLY PRESENTED TO', centerX, 370);
+  ctx.font = '700 23px Manrope, sans-serif';
+  ctx.fillText('THIS IS OFFICIALLY PRESENTED TO', centerX, presLabelY);
 
-  // Recipient Full Name (Focal Point)
+  // Recipient Full Name (Focal Point in Playfair Display)
+  const recipientY = presLabelY + 54 * SCALE;
   ctx.fillStyle = '#0A192F';
-  ctx.font = '700 72px "Playfair Display", Georgia, serif';
-  ctx.fillText(recipientName.toUpperCase(), centerX, 465);
+  ctx.font = '700 82px "Playfair Display", Georgia, serif';
+  ctx.fillText(String(recipientName || 'DEDICATED LEARNER').toUpperCase(), centerX, recipientY);
 
-  // "For successfully completing..."
+  // "For successfully completing all rigorous academic curriculum modules..."
+  const descY = recipientY + 34 * SCALE;
   ctx.fillStyle = '#475569';
-  ctx.font = '600 20px Manrope, sans-serif';
-  const stmt1 = "For successfully completing all rigorous academic curriculum modules, passing required";
-  const stmt2 = "checkpoint assessments, and demonstrating verified practical competencies in";
-  ctx.fillText(stmt1, centerX, 535);
-  ctx.fillText(stmt2, centerX, 565);
-
-  // Course Title Box
-  ctx.fillStyle = '#FF6B00';
-  ctx.font = '700 42px Cinzel, "Playfair Display", Georgia, serif';
-  const maxWidth = 1700;
-  const words = courseTitle.split(' ');
-  let line = '';
-  const lines = [];
-
-  for (let n = 0; n < words.length; n++) {
-    const testLine = line + words[n] + ' ';
-    const metrics = ctx.measureText(testLine);
-    if (metrics.width > maxWidth && n > 0) {
-      lines.push(line.trim());
-      line = words[n] + ' ';
-    } else {
-      line = testLine;
-    }
-  }
-  lines.push(line.trim());
-
-  let courseY = 645;
-  lines.forEach((l) => {
-    ctx.fillText(l, centerX, courseY);
-    courseY += 48;
+  ctx.font = '600 24px Manrope, sans-serif';
+  const descText = "For successfully completing all rigorous academic curriculum modules, passing required checkpoint assessments, and demonstrating verified practical competencies in";
+  const descLines = getWrappedLines(ctx, descText, 680 * SCALE);
+  let curDescY = descY;
+  descLines.forEach((dLine) => {
+    ctx.fillText(dLine, centerX, curDescY);
+    curDescY += 28 * SCALE;
   });
 
-  // Curriculum Meta
+  // Course Title Box (Subtle orange tint box with border)
+  ctx.font = '700 48px Cinzel, "Playfair Display", Georgia, serif';
+  const courseTitleLines = getWrappedLines(ctx, courseTitle, 760 * SCALE);
+  const longestCourseLine = courseTitleLines.reduce((max, l) => Math.max(max, ctx.measureText(l).width), 0);
+  const courseBoxPaddingX = 28 * SCALE;
+  const courseBoxPaddingY = 10 * SCALE;
+  const courseBoxW = Math.min(width - 240 * SCALE, longestCourseLine + courseBoxPaddingX * 2);
+  const courseBoxH = (courseTitleLines.length * 48 * SCALE) + (courseBoxPaddingY * 2);
+  const courseBoxX = centerX - courseBoxW / 2;
+  const courseBoxY = curDescY + 12 * SCALE;
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(255, 107, 0, 0.04)';
+  ctx.strokeStyle = 'rgba(255, 107, 0, 0.22)';
+  ctx.lineWidth = 1.2 * SCALE;
+  ctx.beginPath();
+  ctx.roundRect(courseBoxX, courseBoxY, courseBoxW, courseBoxH, 12 * SCALE);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+
+  // Course Title Text
+  ctx.fillStyle = '#FF6B00';
+  ctx.font = '700 48px Cinzel, "Playfair Display", Georgia, serif';
+  let curCourseY = courseBoxY + courseBoxPaddingY + 36 * SCALE;
+  courseTitleLines.forEach((cLine) => {
+    ctx.fillText(cLine, centerX, curCourseY);
+    curCourseY += 46 * SCALE;
+  });
+
+  // Curriculum Meta Info
+  const metaY = courseBoxY + courseBoxH + 20 * SCALE;
   ctx.fillStyle = '#64748B';
-  ctx.font = '700 20px Manrope, sans-serif';
-  ctx.fillText(`${courseCategory} • ${courseDuration} Curriculum`, centerX, courseY + 10);
+  ctx.font = '700 24px Manrope, sans-serif';
+  ctx.fillText(`${courseCategory} • ${courseDuration} Curriculum`, centerX, metaY);
 
   // ──────────────────────────────────────────────────
-  // ZONE 3: SIGNATURES & PREPRIA SEAL
+  // 5. ZONE 3: SIGNATURES & PREPRIA SEAL EMBLEM
   // ──────────────────────────────────────────────────
-  const sigLeftX = centerX - 540;
-  const sigRightX = centerX + 540;
-  const sigY = 1240;
+  const sigLeftX = centerX - 240 * SCALE;
+  const sigRightX = centerX + 240 * SCALE;
+  const sigBaseY = height - 165 * SCALE;
 
-  // Left Signatory (Dr. Elena Rostova)
+  // Left Signatory: Dr. Elena Rostova
   ctx.fillStyle = '#0F172A';
-  ctx.font = '400 58px "Pinyon Script", "Brush Script MT", cursive';
-  ctx.fillText('Elena Rostova', sigLeftX, sigY - 26);
+  ctx.font = '400 64px "Pinyon Script", "Brush Script MT", cursive';
+  ctx.fillText('Elena Rostova', sigLeftX, sigBaseY - 14 * SCALE);
 
   ctx.strokeStyle = '#CBD5E1';
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 1 * SCALE;
   ctx.beginPath();
-  ctx.moveTo(sigLeftX - 180, sigY);
-  ctx.lineTo(sigLeftX + 180, sigY);
+  ctx.moveTo(sigLeftX - 110 * SCALE, sigBaseY);
+  ctx.lineTo(sigLeftX + 110 * SCALE, sigBaseY);
   ctx.stroke();
 
   ctx.fillStyle = '#0F172A';
-  ctx.font = '800 19px Manrope, sans-serif';
-  ctx.fillText('DR. ELENA ROSTOVA', sigLeftX, sigY + 30);
+  ctx.font = '800 24px Manrope, sans-serif';
+  ctx.fillText('DR. ELENA ROSTOVA', sigLeftX, sigBaseY + 18 * SCALE);
 
   ctx.fillStyle = '#64748B';
-  ctx.font = '600 15px Manrope, sans-serif';
-  ctx.fillText('Lead Academic Director, PREPRIA', sigLeftX, sigY + 54);
+  ctx.font = '600 20px Manrope, sans-serif';
+  ctx.fillText('Lead Academic Director, PREPRIA', sigLeftX, sigBaseY + 36 * SCALE);
 
-  // Center Seal Emblem
-  const sealR = 85;
-  const sealY = 1210;
+  // Center Emblem Seal (96px @ base -> 217px diameter)
+  const sealR = 48 * SCALE;
+  const sealY = sigBaseY + 8 * SCALE;
 
   ctx.save();
   ctx.beginPath();
   ctx.arc(centerX, sealY, sealR, 0, Math.PI * 2);
-  const sealGrad = ctx.createRadialGradient(centerX - 25, sealY - 25, 10, centerX, sealY, sealR);
+  const sealGrad = ctx.createRadialGradient(centerX - 10 * SCALE, sealY - 10 * SCALE, 5 * SCALE, centerX, sealY, sealR);
   sealGrad.addColorStop(0, '#FFFFFF');
   sealGrad.addColorStop(0.5, '#FFF7F0');
   sealGrad.addColorStop(1, '#FFE8D4');
   ctx.fillStyle = sealGrad;
   ctx.fill();
 
+  // Dashed Orange Outer Seal Ring
   ctx.strokeStyle = '#FF6B00';
-  ctx.lineWidth = 3;
-  ctx.setLineDash([8, 6]);
+  ctx.lineWidth = 2 * SCALE;
+  ctx.setLineDash([8 * SCALE, 6 * SCALE]);
   ctx.stroke();
   ctx.restore();
 
-  ctx.fillStyle = '#FF6B00';
-  ctx.font = '700 24px Manrope, sans-serif';
-  ctx.fillText('★', centerX, sealY - 32);
+  // Inner Star & Seal Typography
+  drawStar(ctx, centerX, sealY - 24 * SCALE, 5, 12 * SCALE, 5 * SCALE, '#FF6B00');
 
   ctx.fillStyle = '#0F172A';
-  ctx.font = '900 14px Manrope, sans-serif';
-  ctx.fillText('PREPRIA', centerX, sealY - 10);
+  ctx.font = '900 18px Manrope, sans-serif';
+  ctx.fillText('PREPRIA', centerX, sealY - 5 * SCALE);
 
   ctx.fillStyle = '#FF6B00';
-  ctx.font = '800 17px Cinzel, serif';
-  ctx.fillText('VERIFIED', centerX, sealY + 12);
+  ctx.font = '800 21px Cinzel, serif';
+  ctx.fillText('VERIFIED', centerX, sealY + 14 * SCALE);
 
   ctx.fillStyle = '#64748B';
-  ctx.font = '800 12px Manrope, sans-serif';
-  ctx.fillText('ACCREDITED', centerX, sealY + 32);
+  ctx.font = '800 15px Manrope, sans-serif';
+  ctx.fillText('ACCREDITED', centerX, sealY + 30 * SCALE);
 
-  // Right Signatory (Marcus Vance)
+  // Right Signatory: Marcus Vance
   ctx.fillStyle = '#0F172A';
-  ctx.font = '400 58px "Pinyon Script", "Brush Script MT", cursive';
-  ctx.fillText('Marcus Vance', sigRightX, sigY - 26);
+  ctx.font = '400 64px "Pinyon Script", "Brush Script MT", cursive';
+  ctx.fillText('Marcus Vance', sigRightX, sigBaseY - 14 * SCALE);
 
   ctx.strokeStyle = '#CBD5E1';
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 1 * SCALE;
   ctx.beginPath();
-  ctx.moveTo(sigRightX - 180, sigY);
-  ctx.lineTo(sigRightX + 180, sigY);
+  ctx.moveTo(sigRightX - 110 * SCALE, sigBaseY);
+  ctx.lineTo(sigRightX + 110 * SCALE, sigBaseY);
   ctx.stroke();
 
   ctx.fillStyle = '#0F172A';
-  ctx.font = '800 19px Manrope, sans-serif';
-  ctx.fillText('MARCUS VANCE', sigRightX, sigY + 30);
+  ctx.font = '800 24px Manrope, sans-serif';
+  ctx.fillText('MARCUS VANCE', sigRightX, sigBaseY + 18 * SCALE);
 
   ctx.fillStyle = '#64748B';
-  ctx.font = '600 15px Manrope, sans-serif';
-  ctx.fillText('Head of Career Intelligence & AI', sigRightX, sigY + 54);
+  ctx.font = '600 20px Manrope, sans-serif';
+  ctx.fillText('Head of Career Intelligence & AI', sigRightX, sigBaseY + 36 * SCALE);
 
   // ──────────────────────────────────────────────────
-  // ZONE 4: FOOTER METADATA
+  // 6. ZONE 4: FOOTER METADATA (3 GRID COLUMNS)
   // ──────────────────────────────────────────────────
-  const footerDividerY = 1450;
-  ctx.strokeStyle = 'rgba(196, 151, 86, 0.4)';
-  ctx.lineWidth = 1.5;
+  const footerDividerY = height - 82 * SCALE;
+  const footerW = 900 * SCALE;
+  const footLeftX = centerX - footerW / 2 + 16 * SCALE;
+  const footRightX = centerX + footerW / 2 - 16 * SCALE;
+  const footLabelY = footerDividerY + 20 * SCALE;
+  const footValY = footLabelY + 20 * SCALE;
+
+  ctx.strokeStyle = 'rgba(196, 151, 86, 0.35)';
+  ctx.lineWidth = 1 * SCALE;
   ctx.beginPath();
-  ctx.moveTo(centerX - 800, footerDividerY);
-  ctx.lineTo(centerX + 800, footerDividerY);
+  ctx.moveTo(centerX - footerW / 2, footerDividerY);
+  ctx.lineTo(centerX + footerW / 2, footerDividerY);
   ctx.stroke();
 
-  const footLeftX = centerX - 540;
-  const footRightX = centerX + 540;
-  const footY = 1500;
+  // Column 1: Issue Date (Left Aligned)
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#64748B';
+  ctx.font = '800 18px Manrope, sans-serif';
+  ctx.fillText('ISSUE DATE', footLeftX, footLabelY);
+  ctx.fillStyle = '#0F172A';
+  ctx.font = '800 26px Manrope, sans-serif';
+  ctx.fillText(String(issueDate), footLeftX, footValY);
 
-  // Issue Date (Left)
+  // Column 2: Certificate ID (Center Aligned)
   ctx.textAlign = 'center';
   ctx.fillStyle = '#64748B';
-  ctx.font = '800 13px Manrope, sans-serif';
-  ctx.fillText('ISSUE DATE', footLeftX, footY);
-  ctx.fillStyle = '#0F172A';
-  ctx.font = '800 20px Manrope, sans-serif';
-  ctx.fillText(issueDate, footLeftX, footY + 28);
-
-  // Certificate ID (Center)
-  ctx.fillStyle = '#64748B';
-  ctx.font = '800 13px Manrope, sans-serif';
-  ctx.fillText('CERTIFICATE ID', centerX, footY);
+  ctx.font = '800 18px Manrope, sans-serif';
+  ctx.fillText('CERTIFICATE ID', centerX, footLabelY);
   ctx.fillStyle = '#FF6B00';
-  ctx.font = '800 20px monospace, sans-serif';
-  ctx.fillText(certificateId, centerX, footY + 28);
+  ctx.font = '800 26px "JetBrains Mono", monospace, sans-serif';
+  ctx.fillText(String(certificateId), centerX, footValY);
 
-  // Verification URL (Right)
+  // Column 3: Verification URL (Right Aligned)
+  ctx.textAlign = 'right';
   ctx.fillStyle = '#64748B';
-  ctx.font = '800 13px Manrope, sans-serif';
-  ctx.fillText('VERIFICATION', footRightX, footY);
+  ctx.font = '800 18px Manrope, sans-serif';
+  ctx.fillText('VERIFICATION', footRightX, footLabelY);
   ctx.fillStyle = '#059669';
-  ctx.font = '800 20px Manrope, sans-serif';
-  ctx.fillText(verificationUrl, footRightX, footY + 28);
+  ctx.font = '800 26px Manrope, sans-serif';
+  ctx.fillText(String(verificationUrl), footRightX, footValY);
 
-  // 3. Export High-Resolution PNG & Generate Clean PDF Stream
-  const imgData = canvas.toDataURL('image/jpeg', 0.96);
+  // ──────────────────────────────────────────────────
+  // 7. EXPORT CLEAN STREAM & DIRECT BROWSER DOWNLOAD
+  // ──────────────────────────────────────────────────
+  const imgData = canvas.toDataURL('image/jpeg', 0.98);
   const pdfBytes = createA4LandscapePdfFromJpeg(imgData, width, height);
 
-  // 4. Trigger Direct File Download
   const blob = new Blob([pdfBytes], { type: 'application/pdf' });
   const downloadUrl = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = downloadUrl;
-  const sanitizedTitle = courseTitle.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+  const sanitizedTitle = String(courseTitle || 'Course').replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
   anchor.download = `PREPRIA_Certificate_${sanitizedTitle}.pdf`;
   document.body.appendChild(anchor);
   anchor.click();
@@ -385,7 +512,7 @@ export async function generateCertificatePDF({
 }
 
 /**
- * Pure binary PDF Builder for single A4 landscape image
+ * Pure binary PDF Builder for single A4 landscape image (297mm x 210mm)
  */
 function createA4LandscapePdfFromJpeg(dataUrl, imgWidth, imgHeight) {
   const base64Data = dataUrl.split(',')[1];
